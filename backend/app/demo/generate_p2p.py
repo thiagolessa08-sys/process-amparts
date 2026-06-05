@@ -1,13 +1,13 @@
-"""Gera um event log demo de P2P com variantes estruturais.
+"""Gera um event log demo de P2P com variantes estruturais e atributos financeiros.
 
-Variantes (estruturais) nesta fatia:
+Variantes (estruturais):
 - happy:    caminho feliz completo (~70%)
 - no_gr:    sem "Receber Mercadoria" (~12%)
 - maverick: sem "Aprovar Pedido" (compra fora do processo) (~10%)
-- rework:   "Aprovar Pedido" repetido (retrabalho de aprovacao) (~8%)
+- rework:   "Aprovar Pedido" repetido (retrabalho de aprovação) (~8%)
 
-Os problemas baseados em atributos (pagamento duplicado, desconto perdido)
-entram na Fatia 3 junto com os KPIs.
+Atributos por caso (mesmos em todos os eventos do caso):
+  fornecedor, valor, documento, data_vencimento, comprador, categoria
 """
 import random
 from pathlib import Path
@@ -26,6 +26,18 @@ HAPPY_PATH = [
 ]
 
 RESOURCES = ["Joao Silva", "Maria Souza", "Sistema", "Ana Lima"]
+
+FORNECEDORES = [
+    "Tecnomec Industria", "Vega Componentes", "Alianca Logistica",
+    "Polimix Quimica", "Brasmetal S.A.", "Norte Suprimentos",
+]
+
+CATEGORIAS = [
+    "Materia-prima", "Servicos de TI", "Logistica",
+    "Material de escritorio", "Manutencao", "Consultoria",
+]
+
+COMPRADORES = ["Marina Alves", "Carlos Nunes", "Renata Lima", "Paulo Souza", "Ana Lima"]
 
 
 def _path_for(rng: random.Random) -> list[str]:
@@ -52,16 +64,44 @@ def build_p2p_log(n_cases: int = 2000, seed: int = 7) -> pd.DataFrame:
     for case_idx in range(1, n_cases + 1):
         case_id = 4500000 + case_idx
         t = base + pd.Timedelta(days=rng.randint(0, 120))
-        for activity in _path_for(rng):
-            rows.append(
-                {
-                    CASE_ID: case_id,
-                    ACTIVITY: activity,
-                    TIMESTAMP: t,
-                    RESOURCE: rng.choice(RESOURCES),
-                }
-            )
+        path = _path_for(rng)
+
+        # atributos do caso (fixos para todos os eventos)
+        fornecedor = rng.choice(FORNECEDORES)
+        valor = round(rng.uniform(5_000, 500_000), 2)
+        documento = f"NF {rng.randint(10000, 99999)}"
+        comprador = rng.choice(COMPRADORES)
+        categoria = rng.choice(CATEGORIAS)
+        # prazo de pagamento: 10, 15 ou 30 dias após recebimento da fatura
+        prazo_dias = rng.choice([10, 15, 30])
+
+        # data_vencimento será calculada a partir do timestamp do evento "Receber Fatura"
+        # guardamos o prazo para calcular depois
+        fatura_ts = None
+
+        for activity in path:
+            if activity == "Receber Fatura":
+                fatura_ts = t
+
+            rows.append({
+                CASE_ID: case_id,
+                ACTIVITY: activity,
+                TIMESTAMP: t,
+                RESOURCE: rng.choice(RESOURCES),
+                "fornecedor": fornecedor,
+                "valor": valor,
+                "documento": documento,
+                "comprador": comprador,
+                "categoria": categoria,
+                "prazo_dias": prazo_dias,
+            })
             t = t + pd.Timedelta(hours=rng.randint(2, 48))
+
+        # preencher data_vencimento nos eventos do caso
+        vencimento = (fatura_ts + pd.Timedelta(days=prazo_dias)) if fatura_ts else None
+        for row in rows[-(len(path)):]:
+            row["data_vencimento"] = vencimento
+
     return pd.DataFrame(rows)
 
 

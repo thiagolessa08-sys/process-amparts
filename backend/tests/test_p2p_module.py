@@ -2,7 +2,7 @@ from app.modules.p2p_module import P2PModule
 from app.demo.generate_p2p import build_p2p_log
 
 module = P2PModule()
-log = build_p2p_log(n_cases=500, seed=7)
+log    = build_p2p_log(n_cases=500, seed=7)
 
 
 def test_payload_has_required_keys():
@@ -54,3 +54,46 @@ def test_kpis_have_trend_and_severity():
 def test_total_cases_matches_log():
     payload = module.enrich(log)
     assert payload["totalCases"] == log["case_id"].nunique()
+
+
+def test_drill_maverick_has_rows():
+    payload = module.enrich(log)
+    # ~10% dos casos são maverick — deve haver drill
+    assert "maverick" in payload["drill"]
+    d = payload["drill"]["maverick"]
+    assert d["rows"]
+    assert len(d["columns"]) == 5
+    # cada linha tem Caso, Comprador, Fornecedor, Valor, Categoria
+    row = d["rows"][0]
+    assert row[0].startswith("#")
+
+
+def test_drill_rework_has_rows():
+    payload = module.enrich(log)
+    assert "rework" in payload["drill"]
+    d = payload["drill"]["rework"]
+    assert d["rows"]
+    row = d["rows"][0]
+    assert row[0].startswith("#")
+
+
+def test_drill_conf_has_rows():
+    payload = module.enrich(log)
+    assert "conf" in payload["drill"]
+    d = payload["drill"]["conf"]
+    assert d["rows"]
+    # desvio é um dict badge
+    assert isinstance(d["rows"][0][3], dict)
+
+
+def test_kpis_with_drill_have_drill_key():
+    payload = module.enrich(log)
+    kpis_with_drill = [k for k in payload["kpis"] if "drill" in k]
+    assert len(kpis_with_drill) >= 2
+    for k in kpis_with_drill:
+        assert k["drill"] in payload["drill"]
+
+
+def test_filters_have_fornecedores():
+    payload = module.enrich(log)
+    assert len(payload["filters"]["dims"]) > 0
