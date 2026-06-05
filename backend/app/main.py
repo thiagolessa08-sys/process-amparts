@@ -12,9 +12,17 @@ from app.mining.stats import compute_statistics
 
 app = FastAPI(title="Process Mining API")
 
+import os
+
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.railway\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
