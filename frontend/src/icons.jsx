@@ -1,0 +1,43 @@
+export function Icon({ name, size = 16, style, className, strokeWidth = 1.7 }) {
+  const p = {
+    width: size, height: size, viewBox: "0 0 24 24", fill: "none",
+    stroke: "currentColor", strokeWidth, strokeLinecap: "round", strokeLinejoin: "round",
+    style, className,
+  };
+  const paths = {
+    explorer: <><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.2l3 8M16 7.2l-3 8"/></>,
+    variants: <><path d="M4 6h7M4 12h12M4 18h9"/><circle cx="18" cy="6" r="1.6"/><circle cx="19.5" cy="18" r="1.6"/></>,
+    dashboard: <><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="14" width="8" height="7" rx="1.5"/></>,
+    upload: <><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></>,
+    database: <><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-6"/><path d="M5 11.5v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-6"/></>,
+    sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></>,
+    moon: <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>,
+    alert: <><path d="M10.3 3.3 2 18a2 2 0 0 0 1.7 3h16.6A2 2 0 0 0 22 18L13.7 3.3a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></>,
+    clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    shield: <><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></>,
+    cart: <><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2l2.2 12.2a1.5 1.5 0 0 0 1.5 1.3h8.6a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/></>,
+    bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>,
+    activity: <path d="M3 12h4l2.5 7 5-15L17 12h4"/>,
+    loop: <><path d="M3 8a6 6 0 0 1 10.5-4L17 7"/><path d="M17 3v4h-4"/><path d="M21 16a6 6 0 0 1-10.5 4L7 17"/><path d="M7 21v-4h4"/></>,
+    truck: <><rect x="1.5" y="6" width="12" height="9" rx="1"/><path d="M13.5 9h4l3 3v3h-7z"/><circle cx="6" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/></>,
+    filter: <path d="M3 5h18l-7 8v5l-4 2v-7z"/>,
+    search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,
+    chevronR: <path d="m9 6 6 6-6 6"/>,
+    chevronD: <path d="m6 9 6 6 6-6"/>,
+    close: <path d="M6 6l12 12M18 6 6 18"/>,
+    zoomIn: <><circle cx="11" cy="11" r="7"/><path d="M11 8v6M8 11h6M20 20l-3.5-3.5"/></>,
+    zoomOut: <><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-3.5-3.5"/></>,
+    fit: <path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/>,
+    arrowUp: <path d="M12 19V5M6 11l6-6 6 6"/>,
+    arrowDown: <path d="M12 5v14M6 13l6 6 6-6"/>,
+    external: <><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></>,
+    play: <path d="M7 4v16l13-8z"/>,
+    layers: <><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5M2 18l10 5 10-5"/></>,
+    flag: <><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></>,
+    dots: <><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></>,
+    sliders: <><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h7M15 18h5"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="13" cy="18" r="2"/></>,
+    check: <path d="M5 12l5 5L20 6"/>,
+    calendar: <><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></>,
+  };
+  return <svg {...p}>{paths[name] || null}</svg>;
+}
