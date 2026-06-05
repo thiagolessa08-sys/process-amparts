@@ -49,3 +49,30 @@ def test_statistics_returns_summary():
     assert s["num_cases"] == 2000
     assert s["num_variants"] >= 3
     assert s["mean_throughput_seconds"] > 0
+
+
+def test_upload_replaces_active_log():
+    csv = (
+        "case_id,activity,timestamp\n"
+        "1,Inicio,2026-05-01 09:00:00\n"
+        "1,Fim,2026-05-01 10:00:00\n"
+    )
+    response = client.post(
+        "/api/upload",
+        files={"file": ("meu.csv", csv, "text/csv")},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    # apos upload, o grafo reflete o novo log
+    graph = client.get("/api/process-graph").json()
+    node_ids = {n["id"] for n in graph["nodes"]}
+    assert node_ids == {"Inicio", "Fim"}
+
+
+def test_upload_rejects_invalid_csv():
+    bad = "coluna_errada\n1\n"
+    response = client.post(
+        "/api/upload",
+        files={"file": ("ruim.csv", bad, "text/csv")},
+    )
+    assert response.status_code == 400

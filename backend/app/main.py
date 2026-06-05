@@ -1,7 +1,10 @@
-from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import data_source
+from app.connectors.csv_connector import CSVConnector
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.stats import compute_statistics
@@ -34,3 +37,16 @@ def variants():
 @app.get("/api/statistics")
 def statistics():
     return compute_statistics(data_source.get_log())
+
+
+@app.post("/api/upload")
+async def upload(file: UploadFile = File(...)):
+    dest = Path("data/uploaded.csv")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(await file.read())
+    try:
+        CSVConnector(str(dest)).load()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    data_source.set_source(str(dest))
+    return {"status": "ok", "filename": file.filename}
