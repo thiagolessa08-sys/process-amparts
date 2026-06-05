@@ -1,0 +1,17 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Dados gerados
+backend/data/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Editores / SO
+.DS_Store
+.vscode/
+.idea/
