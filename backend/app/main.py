@@ -4,6 +4,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import data_source
+from app import modules as module_registry
 from app.connectors.csv_connector import CSVConnector
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
@@ -50,3 +51,11 @@ async def upload(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(exc))
     data_source.set_source(str(dest))
     return {"status": "ok", "filename": file.filename}
+
+
+@app.get("/api/modules/{key}")
+def get_module(key: str):
+    module = module_registry.get(key)
+    if not module:
+        raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
+    return module.enrich(data_source.get_log())

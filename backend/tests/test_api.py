@@ -76,3 +76,21 @@ def test_upload_rejects_invalid_csv():
         files={"file": ("ruim.csv", bad, "text/csv")},
     )
     assert response.status_code == 400
+
+
+def test_module_p2p_returns_full_payload():
+    response = client.get("/api/modules/p2p")
+    assert response.status_code == 200
+    body = response.json()
+    for key in ["key", "name", "nodes", "edges", "variants", "kpis", "filters"]:
+        assert key in body, f"chave ausente: {key}"
+    assert body["key"] == "p2p"
+    assert body["totalCases"] == 2000
+    assert len(body["variants"]) >= 3
+    kpi = body["kpis"][0]
+    assert "trend" in kpi and "sev" in kpi
+
+
+def test_module_unknown_returns_404():
+    response = client.get("/api/modules/xyz")
+    assert response.status_code == 404
