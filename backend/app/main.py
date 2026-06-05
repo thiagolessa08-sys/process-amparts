@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.demo.generate_p2p import build_p2p_log
+from app import data_source
 from app.mining.dfg import discover_dfg
+from app.mining.variants import discover_variants
+from app.mining.stats import compute_statistics
 
 app = FastAPI(title="Process Mining API")
 
@@ -21,5 +23,14 @@ def health():
 
 @app.get("/api/process-graph")
 def process_graph():
-    log = build_p2p_log(n_cases=2000)
-    return discover_dfg(log)
+    return discover_dfg(data_source.get_log())
+
+
+@app.get("/api/variants")
+def variants():
+    return discover_variants(data_source.get_log())
+
+
+@app.get("/api/statistics")
+def statistics():
+    return compute_statistics(data_source.get_log())
