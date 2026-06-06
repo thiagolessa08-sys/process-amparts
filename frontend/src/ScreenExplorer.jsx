@@ -110,12 +110,16 @@ function Graph({ graphData, mode, zoom, pan, dragging, animKey }) {
       style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transition: dragging ? "none" : undefined }}>
       <svg className="bypass-svg">
         <defs>
-          {/* máscara que cresce de cima p/ baixo, "desenhando" os desvios */}
-          <clipPath id={`reveal-${animKey}`}>
-            <rect className="reveal-rect" x="-600" y="-60" width="3000" height="0" />
+          {/* máscara que cresce de cima p/ baixo, "desenhando" os desvios.
+              key={animKey} remonta o rect ao trocar de variante -> SMIL replay */}
+          <clipPath id="bypassReveal">
+            <rect key={animKey} x="-600" y="-60" width="3000" height="0">
+              <animate attributeName="height" from="0" to="1800" dur="0.9s"
+                calcMode="spline" keySplines="0.2 0.7 0.3 1" keyTimes="0;1" fill="freeze" begin="0s" />
+            </rect>
           </clipPath>
         </defs>
-        <g clipPath={`url(#reveal-${animKey})`}>
+        <g clipPath="url(#bypassReveal)">
           {bypasses.map((b) => (
             <g key={b.id}>
               <path className="bypass-path" d={b.d} />
