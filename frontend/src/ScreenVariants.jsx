@@ -14,9 +14,14 @@ export const TAG_META = {
 export function VariantsScreen({ data }) {
   const [sel, setSel] = useState(data.variants[0]?.id);
   useEffect(() => { setSel(data.variants[0]?.id); }, [data]);
+
   const selectedVariant = data.variants.find((v) => v.id === sel);
   const maxPct = Math.max(...data.variants.map((v) => v.pct));
-  const conformPct = data.variants.filter(v => v.conformant).reduce((s, v) => s + v.pct, 0);
+
+  // conformidade real calculada dos dados
+  const conformPct = Math.round(
+    data.variants.filter(v => v.conformant).reduce((s, v) => s + v.pct, 0)
+  );
 
   return (
     <div className="variants-layout">
@@ -39,7 +44,9 @@ export function VariantsScreen({ data }) {
                     {v.name}
                     {v.conformant ? <Sev sev="ok">Conforme</Sev> : <span className={"badge " + m.badge}>{m.label}</span>}
                   </div>
-                  <div style={{ marginBottom: 9 }}><MiniPath path={v.path} nodes={data.nodes} color={m.color} conformant={v.conformant} /></div>
+                  <div style={{ marginBottom: 9 }}>
+                    <MiniPath path={v.path} nodes={data.nodes} color={m.color} conformant={v.conformant} />
+                  </div>
                   <div className="var-bar-row">
                     <div className="var-bar"><i style={{ width: (v.pct / maxPct * 100) + "%", background: m.color }} /></div>
                     <span className="var-pct num">{v.pct}%</span>

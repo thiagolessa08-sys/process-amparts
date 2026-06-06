@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Icon } from "./icons.jsx";
 import { ExplorerScreen, DrillDrawer } from "./ScreenExplorer.jsx";
 import { VariantsScreen } from "./ScreenVariants.jsx";
@@ -10,6 +10,8 @@ const SCREENS = [
   { id: "variants", label: "Variantes",  icon: "variants" },
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
 ];
+
+const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "" };
 
 function useTheme() {
   const [theme, setTheme] = useState(() => localStorage.getItem("pm-theme") || "light");
@@ -23,10 +25,12 @@ function useTheme() {
 function Toast({ msg }) {
   if (!msg) return null;
   return (
-    <div style={{ position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)", zIndex: 300,
-      background: "var(--text)", color: "var(--surface)", padding: "10px 16px", borderRadius: 9,
-      fontSize: 13, fontWeight: 550, boxShadow: "var(--shadow-lg)", display: "flex", alignItems: "center", gap: 9 }}
-      className="fade-in">
+    <div style={{
+      position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)",
+      zIndex: 300, background: "var(--text)", color: "var(--surface)",
+      padding: "10px 16px", borderRadius: 9, fontSize: 13, fontWeight: 550,
+      boxShadow: "var(--shadow-lg)", display: "flex", alignItems: "center", gap: 9,
+    }} className="fade-in">
       <Icon name="check" size={15} strokeWidth={2.4} />{msg}
     </div>
   );
@@ -34,33 +38,43 @@ function Toast({ msg }) {
 
 export default function App() {
   const [moduleKey, setModuleKey] = useState("p2p");
-  const [screen, setScreen] = useState("explorer");
-  const [theme, setTheme] = useTheme();
-  const [drill, setDrill] = useState(null);
-  const [toast, setToast] = useState("");
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [screen,    setScreen]    = useState("explorer");
+  const [theme, setTheme]         = useTheme();
+  const [drill,  setDrill]        = useState(null);
+  const [toast,  setToast]        = useState("");
+  const [data,   setData]         = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [error,   setError]       = useState(null);
+  const [filters, setFilters]     = useState(EMPTY_FILTERS);
   const fileRef = useRef(null);
 
-  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2200); };
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2400); };
   const openDrill = (key) => setDrill(data?.drill?.[key] || null);
 
-  async function load(key) {
+  const load = useCallback(async (key, activeFilters) => {
     setLoading(true);
     setError(null);
     try {
-      const d = await fetchModule(key);
+      const d = await fetchModule(key, activeFilters);
       setData(d);
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { load(moduleKey); }, [moduleKey]);
+  useEffect(() => {
+    setFilters(EMPTY_FILTERS);
+    load(moduleKey, EMPTY_FILTERS);
+  }, [moduleKey, load]);
+
   useEffect(() => { setDrill(null); }, [moduleKey, screen]);
+
+  const handleFiltersChange = useCallback((newFilters) => {
+    setFilters(newFilters);
+    load(moduleKey, newFilters);
+  }, [moduleKey, load]);
 
   async function onUpload(e) {
     const file = e.target.files[0];
@@ -68,7 +82,7 @@ export default function App() {
     flash(`Processando "${file.name}"…`);
     try {
       await uploadCsv(file);
-      await load(moduleKey);
+      await load(moduleKey, filters);
       flash(`"${file.name}" carregado com sucesso`);
     } catch (err) {
       flash(`Erro: ${err.message}`);
@@ -79,8 +93,8 @@ export default function App() {
   const alertCount = data?.kpis?.filter((k) => k.icon === "alert").length ?? 0;
 
   const headInfo = !data ? { title: "Carregando…", sub: "" } : {
-    explorer:  { title: "Explorador de Processo",   sub: `Modelo descoberto · ${data.totalCases.toLocaleString("pt-BR")} casos · ${data.avgVariants} variantes` },
-    variants:  { title: "Variantes do Processo",    sub: `${data.avgVariants} caminhos distintos do início ao fim` },
+    explorer:  { title: "Explorador de Processo",      sub: `Modelo descoberto · ${data.totalCases.toLocaleString("pt-BR")} casos · ${data.avgVariants} variantes` },
+    variants:  { title: "Variantes do Processo",       sub: `${data.avgVariants} caminhos distintos do início ao fim` },
     dashboard: { title: "Dashboard de KPIs & Alertas", sub: `Visão financeira — ${data.name}` },
   }[screen];
 
@@ -91,7 +105,6 @@ export default function App() {
           <div className="brand-mark"><Icon name="activity" size={17} strokeWidth={2.2} /></div>
           <div className="brand-name">Fluxo<span>·mining</span></div>
         </div>
-
         <div className="module-switch">
           <button className={moduleKey === "p2p" ? "active" : ""} onClick={() => setModuleKey("p2p")}>
             <span className="dot" style={{ background: "#4F46E5" }} />P2P
@@ -100,12 +113,10 @@ export default function App() {
             <span className="dot" style={{ background: "#16B3A6" }} />O2C
           </button>
         </div>
-
         <div className="topbar-spacer" />
-
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={onUpload} />
         <button className="btn" onClick={() => fileRef.current.click()}><Icon name="upload" size={15} />Importar CSV</button>
-        <button className="btn primary" onClick={() => { setModuleKey(moduleKey); load(moduleKey); flash("Dataset demo carregado"); }}>
+        <button className="btn primary" onClick={() => { load(moduleKey, EMPTY_FILTERS); setFilters(EMPTY_FILTERS); flash("Dataset demo carregado"); }}>
           <Icon name="database" size={15} />Carregar dataset demo
         </button>
         <button className="icon-btn" onClick={() => setTheme(theme === "light" ? "dark" : "light")} title="Alternar tema">
@@ -120,7 +131,7 @@ export default function App() {
             <button key={s.id} className={"nav-item" + (screen === s.id ? " active" : "")} onClick={() => setScreen(s.id)}>
               <Icon name={s.icon} size={17} className="ni-icon" />{s.label}
               {s.id === "dashboard" && alertCount > 0 && <span className="ni-badge">{alertCount}</span>}
-              {s.id === "variants" && data && <span className="ni-badge">{data.avgVariants}</span>}
+              {s.id === "variants"  && data && <span className="ni-badge">{data.avgVariants}</span>}
             </button>
           ))}
 
@@ -130,15 +141,33 @@ export default function App() {
               {data.kpis.filter(k => k.id === "lead" || k.id === "conf").map(k => (
                 <div key={k.id} className="metric-mini" style={{ padding: "5px 6px" }}>
                   <span className="mm-label">{k.label}</span>
-                  <span className="mm-val num" style={{ color: k.sev === "warn" ? "var(--warn-text)" : "var(--text)" }}>{k.value}{k.unit ? " " + k.unit : ""}</span>
+                  <span className="mm-val num" style={{ color: k.sev === "warn" ? "var(--warn-text)" : "var(--text)" }}>
+                    {k.value}{k.unit ? " " + k.unit : ""}
+                  </span>
                 </div>
               ))}
+              {/* conformidade calculada dos dados reais */}
+              {(() => {
+                const conformPct = Math.round(
+                  data.variants.filter(v => v.conformant).reduce((s, v) => s + v.pct, 0)
+                );
+                return (
+                  <div className="metric-mini" style={{ padding: "5px 6px" }}>
+                    <span className="mm-label">Conformidade</span>
+                    <span className="mm-val num" style={{ color: conformPct >= 80 ? "var(--ok-text)" : "var(--warn-text)" }}>
+                      {conformPct}%
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
           <div className="sidebar-foot">
             <div className="dataset-chip">
-              <div className="kpi-ico" style={{ width: 30, height: 30, background: "var(--accent-weak)", color: "var(--accent-text)" }}><Icon name="database" size={15} /></div>
+              <div className="kpi-ico" style={{ width: 30, height: 30, background: "var(--accent-weak)", color: "var(--accent-text)" }}>
+                <Icon name="database" size={15} />
+              </div>
               <div style={{ minWidth: 0 }}>
                 <div className="ds-name">demo_{moduleKey}_2026.csv</div>
                 {data && <div className="ds-sub">{data.totalCases.toLocaleString("pt-BR")} casos</div>}
@@ -173,7 +202,7 @@ export default function App() {
             )}
             {!loading && !error && data && (
               <>
-                {screen === "explorer"  && <ExplorerScreen  key={moduleKey} data={data} />}
+                {screen === "explorer"  && <ExplorerScreen  key={moduleKey} data={data} filters={filters} onFiltersChange={handleFiltersChange} />}
                 {screen === "variants"  && <VariantsScreen  key={moduleKey} data={data} />}
                 {screen === "dashboard" && <DashboardScreen key={moduleKey} data={data} onDrill={openDrill} />}
               </>

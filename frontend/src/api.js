@@ -6,7 +6,16 @@ async function getJson(path) {
   return res.json();
 }
 
-export const fetchModule = (key) => getJson(`/api/modules/${key}`);
+export function fetchModule(key, filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.fornecedores?.length) {
+    filters.fornecedores.forEach((f) => params.append("fornecedores", f));
+  }
+  if (filters.startDate) params.set("start_date", filters.startDate);
+  if (filters.endDate)   params.set("end_date",   filters.endDate);
+  const qs = params.toString();
+  return getJson(`/api/modules/${key}${qs ? "?" + qs : ""}`);
+}
 
 export async function uploadCsv(file) {
   const form = new FormData();

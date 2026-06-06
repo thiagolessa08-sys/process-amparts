@@ -7,22 +7,24 @@ import pandas as pd
 from app.modules.base import ProcessModule
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
+from app.mining.conformance import is_conformant
 from app.eventlog import CASE_ID, TIMESTAMP
 
-# IDs canônicos das atividades
-REQ     = "req"
-PO      = "po"
+# ── IDs canônicos ──────────────────────────────────────────────────────────────
+REQ    = "req"
+PO     = "po"
+ALTER  = "alter"
 APPROVE = "approve"
-GOODS   = "goods"
+GOODS  = "goods"
 INVOICE = "invoice"
-PAY     = "pay"
-START   = "start"
-END     = "end"
+PAY    = "pay"
+START  = "start"
+END    = "end"
 
-# Mapeamento: label do CSV -> id canônico
 ACTIVITY_MAP = {
     "Criar Requisicao":      REQ,
     "Criar Pedido de Compra": PO,
+    "Alterar Pedido":        ALTER,
     "Aprovar Pedido":        APPROVE,
     "Receber Mercadoria":    GOODS,
     "Receber Fatura":        INVOICE,
@@ -31,10 +33,12 @@ ACTIVITY_MAP = {
 
 IDEAL_ACTIVITIES = [REQ, PO, APPROVE, GOODS, INVOICE, PAY]
 
+# ── Esqueleto visual ───────────────────────────────────────────────────────────
 _NODE_SKELETON = {
     START:   {"label": "Início",                  "x": 300, "y":  50, "type": "start"},
     REQ:     {"label": "Criar Requisição",         "x": 300, "y": 162},
     PO:      {"label": "Criar Pedido de Compra",   "x": 300, "y": 290},
+    ALTER:   {"label": "Alterar Pedido",           "x": 600, "y": 290, "branch": True},
     APPROVE: {"label": "Aprovar Pedido",           "x": 300, "y": 420},
     GOODS:   {"label": "Receber Mercadoria",       "x": 300, "y": 558},
     INVOICE: {"label": "Receber Fatura",           "x": 300, "y": 692},
@@ -43,13 +47,16 @@ _NODE_SKELETON = {
 }
 
 _EDGE_FLAGS: dict[tuple, dict] = {
-    (PO, GOODS):        {"skip": True},
+    (PO, ALTER):       {"rework": True},
+    (ALTER, PO):       {"rework": True, "reverse": True},
+    (PO, GOODS):       {"skip": True},
     (APPROVE, INVOICE): {"skip": True, "side": 1, "off": 120},
-    (INVOICE, GOODS):   {"reverse": True},
-    (PAY, PAY):         {"selfloop": True, "dup": True},
+    (INVOICE, GOODS):  {"reverse": True},
+    (PAY, PAY):        {"selfloop": True, "dup": True},
 }
 
 
+# ── Helpers ────────────────────────────────────────────────────────────────────
 def _fmt_days(seconds: float) -> str:
     if seconds <= 0:
         return "—"
@@ -60,6 +67,14 @@ def _fmt_brl(value: float) -> str:
     return f"R$ {value:,.0f}".replace(",", ".")
 
 
+def _fmt_brl_k(value: float) -> str:
+    if value >= 1_000_000:
+        return f"R$ {value/1_000_000:.1f}M".replace(".", ",")
+    if value >= 1_000:
+        return f"R$ {value/1_000:.0f}k"
+    return _fmt_brl(value)
+
+
 def _variant_tag(activities: list[str], conformant: bool) -> str:
     if conformant:
         return "happy"
@@ -67,6 +82,8 @@ def _variant_tag(activities: list[str], conformant: bool) -> str:
         return "crit"
     if APPROVE not in activities:
         return "risk"
+    if ALTER in activities:
+        return "rework"
     if activities.count(APPROVE) > 1:
         return "rework"
     if INVOICE in activities and GOODS in activities:
@@ -76,23 +93,26 @@ def _variant_tag(activities: list[str], conformant: bool) -> str:
 
 
 def _variant_name(activities: list[str], tag: str, idx: int) -> str:
-    names = {
-        "happy":  "Caminho feliz",
-        "crit":   "Pagamento duplicado",
-        "rework": "Retrabalho — aprovação repetida",
-        "risk":   "Sem aprovação de pedido" if APPROVE not in activities
-                  else "Fatura antes da mercadoria",
-    }
-    return names.get(tag, f"Variante {idx + 1}")
+    if tag == "happy":
+        return "Caminho feliz"
+    if activities.count(PAY) > 1:
+        return "Pagamento duplicado"
+    if APPROVE not in activities:
+        return "Sem aprovação de pedido"
+    if ALTER in activities:
+        return "Retrabalho — pedido alterado"
+    if activities.count(APPROVE) > 1:
+        return "Retrabalho — aprovação repetida"
+    if tag == "risk":
+        return "Fatura antes da mercadoria"
+    return f"Variante {idx + 1}"
 
 
 def _case_attrs(log: pd.DataFrame) -> pd.DataFrame:
-    """Retorna uma linha por caso com os atributos financeiros."""
-    first = log.sort_values(TIMESTAMP).groupby(CASE_ID).first().reset_index()
-    return first[[CASE_ID] + [c for c in
-                  ["fornecedor", "valor", "documento", "comprador",
-                   "categoria", "data_vencimento"]
-                  if c in first.columns]]
+    cols = [CASE_ID] + [c for c in
+            ["fornecedor", "valor", "documento", "comprador", "categoria", "data_vencimento"]
+            if c in log.columns]
+    return log.sort_values(TIMESTAMP).groupby(CASE_ID).first().reset_index()[cols]
 
 
 class P2PModule(ProcessModule):
@@ -106,13 +126,13 @@ class P2PModule(ProcessModule):
         log = log.copy()
         log["activity"] = log["activity"].map(ACTIVITY_MAP).fillna(log["activity"])
 
-        total_cases = int(log[CASE_ID].nunique())
-        dfg         = discover_dfg(log)
+        total_cases  = int(log[CASE_ID].nunique())
+        dfg          = discover_dfg(log)
         node_metrics = {n["id"]: n for n in dfg["nodes"]}
         edge_metrics = {(e["source"], e["target"]): e for e in dfg["edges"]}
         raw_variants = discover_variants(log, ideal_path=IDEAL_ACTIVITIES)
 
-        # ---- nós ----
+        # ── nós ──
         nodes = []
         for nid, skel in _NODE_SKELETON.items():
             m = node_metrics.get(nid, {})
@@ -124,9 +144,11 @@ class P2PModule(ProcessModule):
             }
             if "type" in skel:
                 node["type"] = skel["type"]
+            if skel.get("branch"):
+                node["branch"] = True
             nodes.append(node)
 
-        # ---- arestas ----
+        # ── arestas ──
         edges: list[dict] = [
             {"id": f"{START}->{REQ}", "from": START, "to": REQ,
              "cases": total_cases, "time": "—", "bottleneck": False, "rework": False}
@@ -145,7 +167,7 @@ class P2PModule(ProcessModule):
         edges.append({"id": f"{PAY}->{END}", "from": PAY, "to": END,
                       "cases": total_cases, "time": "—", "bottleneck": False, "rework": False})
 
-        # ---- variantes ----
+        # ── variantes ──
         variants = []
         for i, v in enumerate(raw_variants):
             acts = v["activities"]
@@ -158,7 +180,6 @@ class P2PModule(ProcessModule):
                 "conformant": v["conformant"],
             })
 
-        # ---- drill-downs + KPIs ----
         drill = self._compute_drills(log, total_cases, raw_variants)
         kpis  = self._compute_kpis(log, total_cases, raw_variants, drill)
 
@@ -183,31 +204,27 @@ class P2PModule(ProcessModule):
             },
         }
 
-    # ------------------------------------------------------------------
+    # ── drill-downs ────────────────────────────────────────────────────────────
     def _compute_drills(self, log: pd.DataFrame, total_cases: int,
                         variants: list[dict]) -> dict:
         attrs = _case_attrs(log)
-
-        # duração por caso
-        grp = log.groupby(CASE_ID)[TIMESTAMP]
-        dur = ((grp.max() - grp.min()).dt.total_seconds() / 86400).round(1)
-
+        grp   = log.groupby(CASE_ID)[TIMESTAMP]
+        dur   = ((grp.max() - grp.min()).dt.total_seconds() / 86400).round(1)
         drill: dict = {}
 
-        # ---- pagamentos duplicados ----------------------------------------
-        pay_log  = log[log["activity"] == PAY]
-        pay_cnt  = pay_log.groupby(CASE_ID).size()
-        dup_ids  = pay_cnt[pay_cnt > 1].index.tolist()
+        # ── pagamentos duplicados ──────────────────────────────────────────────
+        pay_log = log[log["activity"] == PAY]
+        pay_cnt = pay_log.groupby(CASE_ID).size()
+        dup_ids = pay_cnt[pay_cnt > 1].index.tolist()
         if dup_ids:
-            dup_rows = []
+            rows = []
             for cid in dup_ids[:20]:
                 a = attrs[attrs[CASE_ID] == cid]
                 if a.empty:
                     continue
                 a = a.iloc[0]
-                pay_events = log[(log[CASE_ID] == cid) & (log["activity"] == PAY)]
-                last_pay   = pay_events[TIMESTAMP].max()
-                dup_rows.append([
+                last_pay = pay_log[pay_log[CASE_ID] == cid][TIMESTAMP].max()
+                rows.append([
                     f"#{cid}",
                     a.get("fornecedor", "—"),
                     a.get("documento", "—"),
@@ -219,58 +236,64 @@ class P2PModule(ProcessModule):
                 "title": "Pagamentos duplicados",
                 "sev": "crit",
                 "columns": ["Caso", "Fornecedor", "Documento", "Valor", "Data", "Status"],
-                "rows": dup_rows,
+                "rows": rows,
             }
 
-        # ---- descontos perdidos (pagou após vencimento) -------------------
+        # ── descontos perdidos (pagamento após vencimento) ────────────────────
         if "data_vencimento" in log.columns:
-            pay_events = log[log["activity"] == PAY][[CASE_ID, TIMESTAMP]].copy()
-            pay_events = pay_events.groupby(CASE_ID)[TIMESTAMP].min().reset_index()
-            pay_events.columns = [CASE_ID, "pay_ts"]
+            pay_events = (log[log["activity"] == PAY]
+                          .groupby(CASE_ID)[TIMESTAMP].min()
+                          .reset_index()
+                          .rename(columns={TIMESTAMP: "pay_ts"}))
+            venc_cols = [CASE_ID, "data_vencimento", "valor", "fornecedor", "documento"]
+            venc_cols = [c for c in venc_cols if c in attrs.columns]
+            merged = pay_events.merge(attrs[venc_cols], on=CASE_ID, how="inner")
+            merged["data_vencimento"] = pd.to_datetime(
+                merged["data_vencimento"], errors="coerce"
+            )
+            late = merged[
+                merged["data_vencimento"].notna() &
+                (merged["pay_ts"] > merged["data_vencimento"])
+            ].copy()
+            late["atraso_dias"] = (
+                (late["pay_ts"] - late["data_vencimento"]).dt.total_seconds() / 86400
+            ).round(0).astype(int)
+            late["desconto_valor"] = (late["valor"] * 0.02).round(2)
 
-            venc = attrs[[CASE_ID, "data_vencimento", "valor",
-                          "fornecedor", "documento"]].copy() if "data_vencimento" in attrs.columns else None
+            if not late.empty:
+                total_desc = float(late["desconto_valor"].sum())
+                rows = []
+                for _, r in late.sort_values("desconto_valor", ascending=False).head(20).iterrows():
+                    sev = "crit" if r["atraso_dias"] > 7 else "warn"
+                    rows.append([
+                        f"#{r[CASE_ID]}",
+                        r.get("fornecedor", "—"),
+                        _fmt_brl(r["valor"]),
+                        _fmt_brl(r["desconto_valor"]),
+                        r["data_vencimento"].strftime("%d/%m/%Y"),
+                        {"badge": sev, "text": f"{r['atraso_dias']} dias"},
+                    ])
+                drill["disc"] = {
+                    "title": "Descontos por pagamento antecipado perdidos",
+                    "sev": "warn",
+                    "columns": ["Caso", "Fornecedor", "Valor fatura",
+                                "Desconto perdido", "Vencimento", "Atraso"],
+                    "rows": rows,
+                    "_total_disc": total_desc,
+                    "_late_count": int(len(late)),
+                }
 
-            if venc is not None:
-                merged = pay_events.merge(venc, on=CASE_ID, how="inner")
-                merged["data_vencimento"] = pd.to_datetime(merged["data_vencimento"], errors="coerce")
-                late = merged[merged["pay_ts"] > merged["data_vencimento"]].copy()
-                late["atraso_dias"] = ((late["pay_ts"] - late["data_vencimento"])
-                                       .dt.total_seconds() / 86400).round(0).astype(int)
-                # desconto estimado: 2% do valor se pago em prazo
-                late["desconto"] = (late["valor"] * 0.02).round(2)
-
-                if not late.empty:
-                    disc_rows = []
-                    for _, r in late.head(20).iterrows():
-                        sev = "crit" if r["atraso_dias"] > 7 else "warn"
-                        disc_rows.append([
-                            f"#{r[CASE_ID]}",
-                            r.get("fornecedor", "—"),
-                            _fmt_brl(r["valor"]),
-                            _fmt_brl(r["desconto"]),
-                            r["data_vencimento"].strftime("%d/%m/%Y"),
-                            {"badge": sev, "text": f"{r['atraso_dias']} dias"},
-                        ])
-                    drill["disc"] = {
-                        "title": "Descontos por pagamento antecipado perdidos",
-                        "sev": "warn",
-                        "columns": ["Caso", "Fornecedor", "Valor fatura",
-                                    "Desconto perdido", "Vencimento", "Atraso"],
-                        "rows": disc_rows,
-                    }
-
-        # ---- maverick buying (sem aprovação) ------------------------------
+        # ── maverick buying ────────────────────────────────────────────────────
         has_approve = set(log[log["activity"] == APPROVE][CASE_ID].unique())
         mav_ids = [cid for cid in log[CASE_ID].unique() if cid not in has_approve]
         if mav_ids:
-            mav_rows = []
+            rows = []
             for cid in mav_ids[:20]:
                 a = attrs[attrs[CASE_ID] == cid]
                 if a.empty:
                     continue
                 a = a.iloc[0]
-                mav_rows.append([
+                rows.append([
                     f"#{cid}",
                     a.get("comprador", "—"),
                     a.get("fornecedor", "—"),
@@ -281,113 +304,105 @@ class P2PModule(ProcessModule):
                 "title": "Maverick buying — compras fora do processo",
                 "sev": "warn",
                 "columns": ["Caso", "Comprador", "Fornecedor", "Valor", "Categoria"],
-                "rows": mav_rows,
+                "rows": rows,
             }
 
-        # ---- retrabalho (aprovação repetida) ------------------------------
-        approve_log  = log[log["activity"] == APPROVE]
-        rework_cnt   = approve_log.groupby(CASE_ID).size()
-        rework_ids   = rework_cnt[rework_cnt > 1].index.tolist()
+        # ── retrabalho ─────────────────────────────────────────────────────────
+        # inclui: Aprovar Pedido repetido OU Alterar Pedido presente
+        rework_ids = set()
+        approve_cnt = log[log["activity"] == APPROVE].groupby(CASE_ID).size()
+        rework_ids.update(approve_cnt[approve_cnt > 1].index.tolist())
+        rework_ids.update(log[log["activity"] == ALTER][CASE_ID].unique().tolist())
         if rework_ids:
-            rework_rows = []
-            for cid in rework_ids[:20]:
+            rows = []
+            for cid in list(rework_ids)[:20]:
                 a = attrs[attrs[CASE_ID] == cid]
                 if a.empty:
                     continue
-                a    = a.iloc[0]
-                n_ap = int(rework_cnt[cid])
-                d    = dur.get(cid, 0)
-                rework_rows.append([
+                a = a.iloc[0]
+                has_alter   = ALTER in log[log[CASE_ID] == cid]["activity"].values
+                motivo      = "Pedido alterado" if has_alter else "Aprovação repetida"
+                n_extra     = int(approve_cnt.get(cid, 1)) - 1 if not has_alter else 1
+                d           = dur.get(cid, 0)
+                rows.append([
                     f"#{cid}",
                     a.get("fornecedor", "—"),
-                    str(n_ap - 1),
-                    "Aprovação repetida",
+                    str(n_extra),
+                    motivo,
                     f"{d:.1f} d".replace(".", ","),
                 ])
             drill["rework"] = {
-                "title": "Casos com retrabalho (aprovação repetida)",
+                "title": "Casos com retrabalho",
                 "sev": "warn",
-                "columns": ["Caso", "Fornecedor", "Repetições extra",
-                            "Motivo", "Duração"],
-                "rows": rework_rows,
+                "columns": ["Caso", "Fornecedor", "Repetições extra", "Motivo", "Duração"],
+                "rows": rows,
             }
 
-        # ---- não conformes -----------------------------------------------
-        nonconf_ids = [v for v in variants if not v["conformant"]]
-        if nonconf_ids:
-            conf_rows: list[list] = []
-            # buscar casos por variante (pega os primeiros de cada)
-            from app.mining.variants import discover_variants as _dv
-            from app.mining.conformance import is_conformant as _ic
-            case_seqs = (
-                log.sort_values([CASE_ID, TIMESTAMP])
-                   .groupby(CASE_ID, sort=False)["activity"]
-                   .apply(list)
-            )
-            seen = 0
-            for cid, acts in case_seqs.items():
-                if seen >= 20:
-                    break
-                if _ic(acts, IDEAL_ACTIVITIES):
-                    continue
-                a = attrs[attrs[CASE_ID] == cid]
-                tag = _variant_tag(acts, False)
-                name = _variant_name(acts, tag, 0)
-                desvio = "Sem aprovação" if APPROVE not in acts else \
-                         "Aprovação repetida" if acts.count(APPROVE) > 1 else \
-                         "Ordem invertida"
-                d = dur.get(cid, 0)
-                conf_rows.append([
-                    f"#{cid}",
-                    name,
-                    (a.iloc[0].get("fornecedor", "—") if not a.empty else "—"),
-                    {"badge": "warn", "text": desvio},
-                    f"{d:.1f} d".replace(".", ","),
-                ])
-                seen += 1
-            if conf_rows:
-                drill["conf"] = {
-                    "title": "Casos não conformes ao fluxo padrão",
-                    "sev": "warn",
-                    "columns": ["Caso", "Variante", "Fornecedor", "Desvio", "Duração"],
-                    "rows": conf_rows,
-                }
+        # ── não conformes ──────────────────────────────────────────────────────
+        case_seqs = (
+            log.sort_values([CASE_ID, TIMESTAMP])
+               .groupby(CASE_ID, sort=False)["activity"]
+               .apply(list)
+        )
+        conf_rows: list[list] = []
+        seen = 0
+        for cid, acts in case_seqs.items():
+            if seen >= 20:
+                break
+            if is_conformant(acts, IDEAL_ACTIVITIES):
+                continue
+            a    = attrs[attrs[CASE_ID] == cid]
+            tag  = _variant_tag(acts, False)
+            name = _variant_name(acts, tag, 0)
+            desvio = ("Sem aprovação" if APPROVE not in acts else
+                      "Pedido alterado" if ALTER in acts else
+                      "Aprovação repetida" if acts.count(APPROVE) > 1 else
+                      "Ordem invertida")
+            d = dur.get(cid, 0)
+            conf_rows.append([
+                f"#{cid}", name,
+                (a.iloc[0].get("fornecedor", "—") if not a.empty else "—"),
+                {"badge": "warn", "text": desvio},
+                f"{d:.1f} d".replace(".", ","),
+            ])
+            seen += 1
+        if conf_rows:
+            drill["conf"] = {
+                "title": "Casos não conformes ao fluxo padrão",
+                "sev": "warn",
+                "columns": ["Caso", "Variante", "Fornecedor", "Desvio", "Duração"],
+                "rows": conf_rows,
+            }
 
         return drill
 
-    # ------------------------------------------------------------------
+    # ── KPIs ───────────────────────────────────────────────────────────────────
     def _compute_kpis(self, log: pd.DataFrame, total_cases: int,
                       variants: list[dict], drill: dict) -> list[dict]:
-        grp          = log.groupby(CASE_ID)[TIMESTAMP]
-        durations_s  = (grp.max() - grp.min()).dt.total_seconds()
-        mean_days    = float(durations_s.mean()) / 86400
+        grp         = log.groupby(CASE_ID)[TIMESTAMP]
+        durations_s = (grp.max() - grp.min()).dt.total_seconds()
+        mean_days   = float(durations_s.mean()) / 86400
 
         conformant_count = sum(v["count"] for v in variants if v["conformant"])
         conformance_pct  = round(100 * conformant_count / total_cases) if total_cases else 0
 
-        has_approve  = set(log[log["activity"] == APPROVE][CASE_ID].unique())
-        maverick_cnt = total_cases - len(has_approve)
-        maverick_pct = round(100 * maverick_cnt / total_cases, 1) if total_cases else 0
+        has_approve   = set(log[log["activity"] == APPROVE][CASE_ID].unique())
+        maverick_cnt  = total_cases - len(has_approve)
+        maverick_pct  = round(100 * maverick_cnt / total_cases, 1) if total_cases else 0
 
-        approve_log  = log[log["activity"] == APPROVE]
-        rework_count = int((approve_log.groupby(CASE_ID).size() > 1).sum())
+        rework_ids   = set()
+        ap_cnt       = log[log["activity"] == APPROVE].groupby(CASE_ID).size()
+        rework_ids.update(ap_cnt[ap_cnt > 1].index.tolist())
+        rework_ids.update(log[log["activity"] == ALTER][CASE_ID].unique().tolist())
+        rework_count = len(rework_ids)
         rework_pct   = round(100 * rework_count / total_cases, 1) if total_cases else 0
 
         pay_log   = log[log["activity"] == PAY]
         dup_count = int((pay_log.groupby(CASE_ID).size() > 1).sum())
 
-        disc_count = len(drill.get("disc", {}).get("rows", []))
-        disc_total = 0.0
-        if "disc" in drill and "valor" in log.columns:
-            disc_total = sum(
-                r[2].replace("R$ ", "").replace(".", "").replace(",", ".")
-                for r in drill["disc"]["rows"]
-                if isinstance(r[2], str)
-            )
-            try:
-                disc_total = float(disc_total) * 0.02
-            except Exception:
-                disc_total = 0.0
+        disc_info  = drill.get("disc", {})
+        disc_count = disc_info.get("_late_count", 0)
+        disc_total = disc_info.get("_total_disc", 0.0)
 
         def trend(val: float, direction: str, steps: int = 7) -> list[float]:
             delta = val * 0.08
@@ -397,7 +412,7 @@ class P2PModule(ProcessModule):
 
         kpis = []
 
-        # alertas primeiro (icon="alert") — aparecem na linha de alertas do Dashboard
+        # alertas (icon="alert") aparecem na seção de alertas do Dashboard
         if dup_count > 0:
             kpis.append({
                 "id": "dup", "icon": "alert", "sev": "crit",
@@ -412,13 +427,12 @@ class P2PModule(ProcessModule):
             kpis.append({
                 "id": "disc", "icon": "alert", "sev": "warn",
                 "label": "Descontos perdidos",
-                "value": str(disc_count), "unit": "faturas",
-                "sub": "Pagamento após data de vencimento",
-                "trend": trend(float(disc_count), "down"), "trendDir": "down",
+                "value": _fmt_brl_k(disc_total),
+                "sub": f"{disc_count} faturas pagas após vencimento",
+                "trend": trend(disc_total / 1000, "down"), "trendDir": "down",
                 "drill": "disc",
             })
 
-        # indicadores-chave
         kpis += [
             {
                 "id": "lead", "icon": "clock", "sev": "info",
@@ -450,7 +464,7 @@ class P2PModule(ProcessModule):
                 "sev": "warn" if rework_pct > 5 else "info",
                 "label": "Taxa de retrabalho",
                 "value": f"{rework_pct}%".replace(".", ","),
-                "sub": f"{rework_count} casos com aprovação repetida",
+                "sub": f"{rework_count} casos com pedido alterado ou aprovação repetida",
                 "trend": trend(rework_pct, "down"), "trendDir": "down", "good": "down",
                 "drill": "rework" if "rework" in drill else None,
             },
@@ -463,7 +477,7 @@ class P2PModule(ProcessModule):
             },
         ]
 
-        # remover drill=None para não poluir o JSON
+        # remover drill=None
         for k in kpis:
             if k.get("drill") is None:
                 k.pop("drill", None)

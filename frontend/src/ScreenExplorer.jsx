@@ -16,11 +16,17 @@ export function DrillDrawer({ drill, onClose }) {
       <div className="drawer">
         <div className="drawer-head">
           <div>
-            <div className="dp-kicker" style={{ color: "var(--" + drill.sev + "-text)" }}>Drill-down · {drill.rows.length} casos</div>
+            <div className="dp-kicker" style={{ color: `var(--${drill.sev}-text)` }}>
+              Drill-down · {drill.rows.length} casos
+            </div>
             <h2 className="drawer-title">{drill.title}</h2>
             <div className="drawer-meta">
               <div className="dm">Casos afetados<b>{drill.rows.length}</b></div>
-              <div className="dm">Severidade<b style={{ color: "var(--" + drill.sev + "-text)", fontFamily: "var(--sans)", fontSize: 14 }}>{drill.sev === "crit" ? "Crítico" : drill.sev === "warn" ? "Atenção" : "Info"}</b></div>
+              <div className="dm">Severidade
+                <b style={{ color: `var(--${drill.sev}-text)`, fontFamily: "var(--sans)", fontSize: 14 }}>
+                  {drill.sev === "crit" ? "Crítico" : drill.sev === "warn" ? "Atenção" : "Info"}
+                </b>
+              </div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -105,20 +111,53 @@ function ExplorerDetail({ selected, data, nodeMap, onClose }) {
   );
 }
 
-export function ExplorerScreen({ data }) {
-  const [variantId, setVariantId] = useState("");
-  const [dimFilter, setDimFilter] = useState([]);
-  const [flowOn, setFlowOn] = useState(true);
+export function ExplorerScreen({ data, filters, onFiltersChange }) {
+  const [variantId,  setVariantId]  = useState("");
+  const [flowOn,     setFlowOn]     = useState(true);
   const [showCounts, setShowCounts] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [actLevel, setActLevel] = useState(100);
-  const [pathLevel, setPathLevel] = useState(80);
+  const [selected,   setSelected]   = useState(null);
+  const [actLevel,   setActLevel]   = useState(100);
+  const [pathLevel,  setPathLevel]  = useState(80);
 
-  useEffect(() => { setSelected(null); setVariantId(""); setDimFilter([]); }, [data]);
+  // filtros locais (espelham o estado externo)
+  const [localForn, setLocalForn] = useState(filters?.fornecedores ?? []);
+  const [startDate, setStartDate] = useState(filters?.startDate ?? "");
+  const [endDate,   setEndDate]   = useState(filters?.endDate   ?? "");
+
+  useEffect(() => { setSelected(null); setVariantId(""); }, [data]);
 
   const selectedVariant = useMemo(() => data.variants.find((v) => v.id === variantId) || null, [variantId, data]);
-  const toggleDim = (d) => setDimFilter((f) => f.includes(d) ? f.filter((x) => x !== d) : [...f, d]);
   const nodeMap = useMemo(() => Object.fromEntries(data.nodes.map((n) => [n.id, n])), [data]);
+
+  // conformidade real dos dados
+  const conformPct = Math.round(
+    data.variants.filter(v => v.conformant).reduce((s, v) => s + v.pct, 0)
+  );
+
+  function toggleForn(d) {
+    const next = localForn.includes(d) ? localForn.filter((x) => x !== d) : [...localForn, d];
+    setLocalForn(next);
+    onFiltersChange({ fornecedores: next, startDate, endDate });
+  }
+
+  function clearFilters() {
+    setLocalForn([]); setVariantId("");
+    setStartDate(""); setEndDate("");
+    onFiltersChange({ fornecedores: [], startDate: "", endDate: "" });
+  }
+
+  function handleDateChange(field, value) {
+    const next = field === "start"
+      ? { fornecedores: localForn, startDate: value, endDate }
+      : { fornecedores: localForn, startDate, endDate: value };
+    if (field === "start") setStartDate(value); else setEndDate(value);
+    // só busca quando ambas as datas estão preenchidas ou ambas vazias
+    if ((next.startDate && next.endDate) || (!next.startDate && !next.endDate)) {
+      onFiltersChange(next);
+    }
+  }
+
+  const hasFilters = localForn.length > 0 || startDate || endDate;
 
   return (
     <div className={"explorer" + (selected ? " with-detail" : "")}>
@@ -126,7 +165,7 @@ export function ExplorerScreen({ data }) {
         <div className="filter-sec">
           <div className="filter-head">
             <span><Icon name="filter" size={12} style={{ verticalAlign: -1, marginRight: 5 }} />Filtros</span>
-            {(dimFilter.length > 0 || variantId) && <button className="btn ghost sm" style={{ height: 22, padding: "0 6px", fontSize: 11 }} onClick={() => { setDimFilter([]); setVariantId(""); }}>Limpar</button>}
+            {hasFilters && <button className="btn ghost sm" style={{ height: 22, padding: "0 6px", fontSize: 11 }} onClick={clearFilters}>Limpar</button>}
           </div>
           <label className="field-label">Variante</label>
           <select className="select" value={variantId} onChange={(e) => setVariantId(e.target.value)}>
@@ -137,14 +176,29 @@ export function ExplorerScreen({ data }) {
 
         {data.filters.dims.length > 0 && (
           <div className="filter-sec">
-            <div className="filter-head"><span>{data.filters.dimLabel}</span>{dimFilter.length > 0 && <span className="fh-count">{dimFilter.length}</span>}</div>
+            <div className="filter-head">
+              <span>{data.filters.dimLabel}</span>
+              {localForn.length > 0 && <span className="fh-count">{localForn.length}</span>}
+            </div>
             <div className="chip-list">
               {data.filters.dims.map((d) => (
-                <button key={d} className={"fchip" + (dimFilter.includes(d) ? " on" : "")} onClick={() => toggleDim(d)}>{d}</button>
+                <button key={d} className={"fchip" + (localForn.includes(d) ? " on" : "")} onClick={() => toggleForn(d)}>{d}</button>
               ))}
             </div>
           </div>
         )}
+
+        <div className="filter-sec">
+          <div className="filter-head"><span>Período</span></div>
+          <div className="date-row">
+            <input className="input" type="date" value={startDate}
+              onChange={(e) => handleDateChange("start", e.target.value)}
+              placeholder="Início" style={{ fontSize: 12 }} />
+            <input className="input" type="date" value={endDate}
+              onChange={(e) => handleDateChange("end", e.target.value)}
+              placeholder="Fim" style={{ fontSize: 12 }} />
+          </div>
+        </div>
 
         <div className="filter-sec">
           <div className="filter-head"><span>Detalhe do modelo</span></div>
@@ -159,12 +213,19 @@ export function ExplorerScreen({ data }) {
           <div className="metric-mini"><span className="mm-label">Total de casos</span><span className="mm-val num">{data.totalCases.toLocaleString("pt-BR")}</span></div>
           <div className="metric-mini"><span className="mm-label">Variantes</span><span className="mm-val num">{data.avgVariants}</span></div>
           <div className="metric-mini"><span className="mm-label">Atividades</span><span className="mm-val num">{data.nodes.filter(n => !n.type).length}</span></div>
+          <div className="metric-mini">
+            <span className="mm-label">Conformidade</span>
+            <span className="mm-val num" style={{ color: conformPct >= 80 ? "var(--ok-text)" : "var(--warn-text)" }}>{conformPct}%</span>
+          </div>
         </div>
       </aside>
 
       <div className="graph-stage">
         <div className="graph-toolbar">
-          <div className="gt-pill"><Icon name="layers" size={14} style={{ color: "var(--accent)" }} />{selectedVariant ? selectedVariant.name : "Modelo completo"} · <b>{(selectedVariant ? selectedVariant.cases : data.totalCases).toLocaleString("pt-BR")}</b> casos</div>
+          <div className="gt-pill">
+            <Icon name="layers" size={14} style={{ color: "var(--accent)" }} />
+            {selectedVariant ? selectedVariant.name : "Modelo completo"} · <b>{(selectedVariant ? selectedVariant.cases : data.totalCases).toLocaleString("pt-BR")}</b> casos
+          </div>
           <div style={{ flex: 1 }} />
           <div className="gt-pill" style={{ padding: 4, gap: 4 }}>
             <button className={"btn sm" + (flowOn ? " primary" : " ghost")} onClick={() => setFlowOn((f) => !f)}><Icon name="play" size={13} />Fluxo</button>
@@ -174,7 +235,7 @@ export function ExplorerScreen({ data }) {
         <ProcessGraph data={data} selectedVariant={selectedVariant} flowOn={flowOn} showCounts={showCounts}
           onSelectNode={(n) => setSelected({ kind: "node", item: n })}
           onSelectEdge={(e) => setSelected({ kind: "edge", item: e })}
-          selected={selected} dimFilter={dimFilter} />
+          selected={selected} dimFilter={localForn} />
       </div>
 
       {selected && <ExplorerDetail selected={selected} data={data} nodeMap={nodeMap} onClose={() => setSelected(null)} />}

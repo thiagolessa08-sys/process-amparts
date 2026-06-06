@@ -1,13 +1,17 @@
 """Gera um event log demo de P2P com variantes estruturais e atributos financeiros.
 
-Variantes (estruturais):
-- happy:    caminho feliz completo (~70%)
-- no_gr:    sem "Receber Mercadoria" (~12%)
-- maverick: sem "Aprovar Pedido" (compra fora do processo) (~10%)
-- rework:   "Aprovar Pedido" repetido (retrabalho de aprovação) (~8%)
+Variantes (~%):
+- happy          60%  caminho feliz completo
+- no_gr          10%  sem Receber Mercadoria
+- maverick        9%  sem Aprovar Pedido (compra fora do processo)
+- rework_aprov    7%  Aprovar Pedido repetido
+- alterar         8%  Alterar Pedido → volta ao Criar Pedido de Compra
+- dup_pay         6%  Pagar aparece duas vezes (pagamento duplicado)
 
-Atributos por caso (mesmos em todos os eventos do caso):
-  fornecedor, valor, documento, data_vencimento, comprador, categoria
+Atributos por caso (fixos em todos os eventos):
+  fornecedor, valor, documento, data_vencimento, comprador, categoria, prazo_dias
+
+Pagamento tardio: ~25% dos casos happy/no_gr/alterar pagam após data_vencimento.
 """
 import random
 from pathlib import Path
@@ -25,8 +29,6 @@ HAPPY_PATH = [
     "Pagar",
 ]
 
-RESOURCES = ["Joao Silva", "Maria Souza", "Sistema", "Ana Lima"]
-
 FORNECEDORES = [
     "Tecnomec Industria", "Vega Componentes", "Alianca Logistica",
     "Polimix Quimica", "Brasmetal S.A.", "Norte Suprimentos",
@@ -38,69 +40,94 @@ CATEGORIAS = [
 ]
 
 COMPRADORES = ["Marina Alves", "Carlos Nunes", "Renata Lima", "Paulo Souza", "Ana Lima"]
+RESOURCES   = ["Joao Silva", "Maria Souza", "Sistema", "Ana Lima"]
 
 
-def _path_for(rng: random.Random) -> list[str]:
+def _build_path(rng: random.Random) -> tuple[list[str], str]:
+    """Retorna (path, variant_type)."""
     r = rng.random()
+    if r < 0.60:
+        return list(HAPPY_PATH), "happy"
     if r < 0.70:
-        return list(HAPPY_PATH)
-    if r < 0.82:
-        return [a for a in HAPPY_PATH if a != "Receber Mercadoria"]
-    if r < 0.92:
-        return [a for a in HAPPY_PATH if a != "Aprovar Pedido"]
-    # rework: duplica "Aprovar Pedido"
-    path = []
-    for a in HAPPY_PATH:
-        path.append(a)
-        if a == "Aprovar Pedido":
-            path.append("Aprovar Pedido")
-    return path
+        return [a for a in HAPPY_PATH if a != "Receber Mercadoria"], "no_gr"
+    if r < 0.79:
+        return [a for a in HAPPY_PATH if a != "Aprovar Pedido"], "maverick"
+    if r < 0.86:
+        path = []
+        for a in HAPPY_PATH:
+            path.append(a)
+            if a == "Aprovar Pedido":
+                path.append("Aprovar Pedido")
+        return path, "rework_aprov"
+    if r < 0.94:
+        return [
+            "Criar Requisicao",
+            "Criar Pedido de Compra",
+            "Alterar Pedido",
+            "Criar Pedido de Compra",
+            "Aprovar Pedido",
+            "Receber Mercadoria",
+            "Receber Fatura",
+            "Pagar",
+        ], "alterar"
+    # dup_pay: paga duas vezes
+    return list(HAPPY_PATH) + ["Pagar"], "dup_pay"
 
 
 def build_p2p_log(n_cases: int = 2000, seed: int = 7) -> pd.DataFrame:
-    rng = random.Random(seed)
-    rows = []
-    base = pd.Timestamp("2026-01-01 08:00:00")
+    rng   = random.Random(seed)
+    rows  = []
+    base  = pd.Timestamp("2026-01-01 08:00:00")
+
     for case_idx in range(1, n_cases + 1):
-        case_id = 4500000 + case_idx
-        t = base + pd.Timedelta(days=rng.randint(0, 120))
-        path = _path_for(rng)
+        case_id   = 4500000 + case_idx
+        path, vtype = _build_path(rng)
 
-        # atributos do caso (fixos para todos os eventos)
-        fornecedor = rng.choice(FORNECEDORES)
-        valor = round(rng.uniform(5_000, 500_000), 2)
-        documento = f"NF {rng.randint(10000, 99999)}"
-        comprador = rng.choice(COMPRADORES)
-        categoria = rng.choice(CATEGORIAS)
-        # prazo de pagamento: 10, 15 ou 30 dias após recebimento da fatura
-        prazo_dias = rng.choice([10, 15, 30])
+        fornecedor   = rng.choice(FORNECEDORES)
+        valor        = round(rng.uniform(5_000, 500_000), 2)
+        documento    = f"NF {rng.randint(10000, 99999)}"
+        comprador    = rng.choice(COMPRADORES)
+        categoria    = rng.choice(CATEGORIAS)
+        prazo_dias   = rng.choice([10, 15, 30])
+        # pagamento tardio em ~25% dos casos onde há fatura
+        late_pay = vtype not in ("maverick",) and rng.random() < 0.25
 
-        # data_vencimento será calculada a partir do timestamp do evento "Receber Fatura"
-        # guardamos o prazo para calcular depois
-        fatura_ts = None
+        t          = base + pd.Timedelta(days=rng.randint(0, 150))
+        fatura_ts  = None
+        path_rows  = []
 
         for activity in path:
             if activity == "Receber Fatura":
                 fatura_ts = t
 
-            rows.append({
-                CASE_ID: case_id,
-                ACTIVITY: activity,
-                TIMESTAMP: t,
-                RESOURCE: rng.choice(RESOURCES),
-                "fornecedor": fornecedor,
-                "valor": valor,
-                "documento": documento,
-                "comprador": comprador,
-                "categoria": categoria,
-                "prazo_dias": prazo_dias,
+            # Pagar: se late_pay e há fatura, avança além do prazo
+            if activity == "Pagar" and late_pay and fatura_ts is not None:
+                # paga entre (prazo + 3) e (prazo + 30) dias após fatura
+                extra = rng.randint(3, 30)
+                t = fatura_ts + pd.Timedelta(days=prazo_dias + extra)
+                late_pay = False  # aplica só no primeiro Pagar
+
+            path_rows.append({
+                CASE_ID:        case_id,
+                ACTIVITY:       activity,
+                TIMESTAMP:      t,
+                RESOURCE:       rng.choice(RESOURCES),
+                "fornecedor":   fornecedor,
+                "valor":        valor,
+                "documento":    documento,
+                "comprador":    comprador,
+                "categoria":    categoria,
+                "prazo_dias":   prazo_dias,
+                "data_vencimento": None,   # preenchido abaixo
             })
             t = t + pd.Timedelta(hours=rng.randint(2, 48))
 
         # preencher data_vencimento nos eventos do caso
         vencimento = (fatura_ts + pd.Timedelta(days=prazo_dias)) if fatura_ts else None
-        for row in rows[-(len(path)):]:
+        for row in path_rows:
             row["data_vencimento"] = vencimento
+
+        rows.extend(path_rows)
 
     return pd.DataFrame(rows)
 
