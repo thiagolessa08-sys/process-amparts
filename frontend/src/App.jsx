@@ -10,205 +10,152 @@ const SCREENS = [
   { id: "variants", label: "Variantes",  icon: "variants" },
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
 ];
-
 const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "" };
 
 function useTheme() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("pm-theme") || "light");
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("pm-theme", theme);
-  }, [theme]);
-  return [theme, setTheme];
+  const [dark, setDark] = useState(() => localStorage.getItem("pm-theme") === "dark");
+  useEffect(() => { localStorage.setItem("pm-theme", dark ? "dark" : "light"); }, [dark]);
+  return [dark, setDark];
 }
 
 function Toast({ msg }) {
   if (!msg) return null;
   return (
     <div style={{
-      position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)",
-      zIndex: 300, background: "var(--text)", color: "var(--surface)",
-      padding: "10px 16px", borderRadius: 9, fontSize: 13, fontWeight: 550,
-      boxShadow: "var(--shadow-lg)", display: "flex", alignItems: "center", gap: 9,
-    }} className="fade-in">
-      <Icon name="check" size={15} strokeWidth={2.4} />{msg}
+      position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)", zIndex: 300,
+      background: "var(--ink)", color: "var(--panel)", padding: "10px 16px", borderRadius: 10,
+      fontSize: 13, fontWeight: 600, boxShadow: "var(--shadow-pop)", display: "flex", alignItems: "center", gap: 9,
+    }}>
+      <Icon name="check" size={15} strokeWidth={2.6} />{msg}
     </div>
   );
 }
 
 export default function App() {
   const [moduleKey, setModuleKey] = useState("p2p");
-  const [screen,    setScreen]    = useState("explorer");
-  const [theme, setTheme]         = useTheme();
-  const [drill,  setDrill]        = useState(null);
-  const [toast,  setToast]        = useState("");
-  const [data,   setData]         = useState(null);
-  const [loading, setLoading]     = useState(true);
-  const [error,   setError]       = useState(null);
-  const [filters, setFilters]     = useState(EMPTY_FILTERS);
+  const [screen, setScreen]   = useState("explorer");
+  const [dark, setDark]       = useTheme();
+  const [drill, setDrill]     = useState(null);
+  const [toast, setToast]     = useState("");
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const fileRef = useRef(null);
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2400); };
   const openDrill = (key) => setDrill(data?.drill?.[key] || null);
 
-  const load = useCallback(async (key, activeFilters) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const d = await fetchModule(key, activeFilters);
-      setData(d);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(async (key, f) => {
+    setLoading(true); setError(null);
+    try { setData(await fetchModule(key, f)); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    setFilters(EMPTY_FILTERS);
-    load(moduleKey, EMPTY_FILTERS);
-  }, [moduleKey, load]);
-
+  useEffect(() => { setFilters(EMPTY_FILTERS); load(moduleKey, EMPTY_FILTERS); }, [moduleKey, load]);
   useEffect(() => { setDrill(null); }, [moduleKey, screen]);
 
-  const handleFiltersChange = useCallback((newFilters) => {
-    setFilters(newFilters);
-    load(moduleKey, newFilters);
-  }, [moduleKey, load]);
+  const onFiltersChange = useCallback((f) => { setFilters(f); load(moduleKey, f); }, [moduleKey, load]);
 
   async function onUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
     flash(`Processando "${file.name}"…`);
-    try {
-      await uploadCsv(file);
-      await load(moduleKey, filters);
-      flash(`"${file.name}" carregado com sucesso`);
-    } catch (err) {
-      flash(`Erro: ${err.message}`);
-    }
+    try { await uploadCsv(file); await load(moduleKey, filters); flash(`"${file.name}" carregado`); }
+    catch (err) { flash(`Erro: ${err.message}`); }
     e.target.value = "";
   }
 
   const alertCount = data?.kpis?.filter((k) => k.icon === "alert").length ?? 0;
+  const conformPct = data ? Math.round(data.variants.filter(v => v.conformant).reduce((s, v) => s + v.pct, 0)) : 0;
+  const leadKpi = data?.kpis?.find(k => k.id === "lead");
 
-  const headInfo = !data ? { title: "Carregando…", sub: "" } : {
-    explorer:  { title: "Explorador de Processo",      sub: `Modelo descoberto · ${data.totalCases.toLocaleString("pt-BR")} casos · ${data.avgVariants} variantes` },
-    variants:  { title: "Variantes do Processo",       sub: `${data.avgVariants} caminhos distintos do início ao fim` },
-    dashboard: { title: "Dashboard de KPIs & Alertas", sub: `Visão financeira — ${data.name}` },
+  const headInfo = !data ? { title: "Carregando…", sub: null } : {
+    explorer:  { title: "Explorador de Processo", sub: <>Modelo descoberto · <b>{data.totalCases.toLocaleString("pt-BR")}</b> casos · <b>{data.avgVariants}</b> variantes</> },
+    variants:  { title: "Variantes do Processo",  sub: <><b>{data.avgVariants}</b> caminhos distintos do início ao fim</> },
+    dashboard: { title: "Dashboard de KPIs & Alertas", sub: <>Visão financeira — <b>{data.name}</b></> },
   }[screen];
 
   return (
-    <div className="app">
+    <div className={"shell" + (dark ? " dark" : "")}>
+      {/* TOPBAR */}
       <header className="topbar">
         <div className="brand">
-          <div className="brand-mark"><Icon name="activity" size={17} strokeWidth={2.2} /></div>
-          <div className="brand-name">Fluxo<span>·mining</span></div>
+          <span className="logo"><Icon name="activity" size={17} strokeWidth={2.4} /></span>
+          <span className="name">Fluxo<span className="dim">·mining</span></span>
         </div>
-        <div className="module-switch">
-          <button className={moduleKey === "p2p" ? "active" : ""} onClick={() => setModuleKey("p2p")}>
-            <span className="dot" style={{ background: "#4F46E5" }} />P2P
+        <div className="tabs">
+          <button className={moduleKey === "p2p" ? "on" : ""} onClick={() => setModuleKey("p2p")}>
+            <span className="pdot" style={{ background: "#5a2fe0" }} />P2P
           </button>
-          <button className={moduleKey === "o2c" ? "active" : ""} onClick={() => setModuleKey("o2c")}>
-            <span className="dot" style={{ background: "#16B3A6" }} />O2C
+          <button className={moduleKey === "o2c" ? "on" : ""} onClick={() => setModuleKey("o2c")}>
+            <span className="pdot" style={{ background: "#16a34a" }} />O2C
           </button>
         </div>
-        <div className="topbar-spacer" />
+        <span className="spacer" />
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={onUpload} />
         <button className="btn" onClick={() => fileRef.current.click()}><Icon name="upload" size={15} />Importar CSV</button>
         <button className="btn primary" onClick={() => { load(moduleKey, EMPTY_FILTERS); setFilters(EMPTY_FILTERS); flash("Dataset demo carregado"); }}>
           <Icon name="database" size={15} />Carregar dataset demo
         </button>
-        <button className="icon-btn" onClick={() => setTheme(theme === "light" ? "dark" : "light")} title="Alternar tema">
-          <Icon name={theme === "light" ? "moon" : "sun"} size={18} />
+        <button className="icon-btn" onClick={() => setDark(d => !d)} title="Alternar tema">
+          <Icon name={dark ? "sun" : "moon"} size={17} />
         </button>
       </header>
 
-      <div className="body">
-        <nav className="sidebar">
-          <div className="nav-label">Análise</div>
+      <div className="main-row">
+        {/* RAIL */}
+        <nav className="rail">
+          <div className="rail-eyebrow">Análise</div>
           {SCREENS.map((s) => (
-            <button key={s.id} className={"nav-item" + (screen === s.id ? " active" : "")} onClick={() => setScreen(s.id)}>
-              <Icon name={s.icon} size={17} className="ni-icon" />{s.label}
-              {s.id === "dashboard" && alertCount > 0 && <span className="ni-badge">{alertCount}</span>}
-              {s.id === "variants"  && data && <span className="ni-badge">{data.avgVariants}</span>}
-            </button>
-          ))}
-
-          <div className="nav-label" style={{ marginTop: 14 }}>Processo</div>
-          {data && (
-            <div style={{ padding: "2px 4px" }}>
-              {data.kpis.filter(k => k.id === "lead" || k.id === "conf").map(k => (
-                <div key={k.id} className="metric-mini" style={{ padding: "5px 6px" }}>
-                  <span className="mm-label">{k.label}</span>
-                  <span className="mm-val num" style={{ color: k.sev === "warn" ? "var(--warn-text)" : "var(--text)" }}>
-                    {k.value}{k.unit ? " " + k.unit : ""}
-                  </span>
-                </div>
-              ))}
-              {/* conformidade calculada dos dados reais */}
-              {(() => {
-                const conformPct = Math.round(
-                  data.variants.filter(v => v.conformant).reduce((s, v) => s + v.pct, 0)
-                );
-                return (
-                  <div className="metric-mini" style={{ padding: "5px 6px" }}>
-                    <span className="mm-label">Conformidade</span>
-                    <span className="mm-val num" style={{ color: conformPct >= 80 ? "var(--ok-text)" : "var(--warn-text)" }}>
-                      {conformPct}%
-                    </span>
-                  </div>
-                );
-              })()}
+            <div key={s.id} className={"nav-item" + (screen === s.id ? " on" : "")} onClick={() => setScreen(s.id)}>
+              <Icon name={s.icon} size={17} />{s.label}
+              {s.id === "variants" && data && <span className="nbadge">{data.avgVariants}</span>}
+              {s.id === "dashboard" && alertCount > 0 && <span className="nbadge">{alertCount}</span>}
             </div>
-          )}
-
-          <div className="sidebar-foot">
-            <div className="dataset-chip">
-              <div className="kpi-ico" style={{ width: 30, height: 30, background: "var(--accent-weak)", color: "var(--accent-text)" }}>
-                <Icon name="database" size={15} />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div className="ds-name">demo_{moduleKey}_2026.csv</div>
-                {data && <div className="ds-sub">{data.totalCases.toLocaleString("pt-BR")} casos</div>}
-              </div>
+          ))}
+          <div className="rail-eyebrow">Processo</div>
+          <div className="metric"><span className="k">Lead time médio</span><span className="v good">{leadKpi ? `${leadKpi.value} ${leadKpi.unit || ""}` : "—"}</span></div>
+          <div className="metric"><span className="k">Conformidade do processo</span><span className="v">{conformPct}%</span></div>
+          <div className="rail-spacer" />
+          <div className="file-card">
+            <span className="fi"><Icon name="database" size={16} /></span>
+            <div>
+              <div className="fn">demo_{moduleKey}_2026.csv</div>
+              <div className="fs">{data ? `${data.totalCases.toLocaleString("pt-BR")} casos` : "—"}</div>
             </div>
           </div>
         </nav>
 
-        <main className="main">
-          <div className="page-head">
-            <div>
-              <h1 className="page-title">{headInfo.title}
-                {data && <span className="badge accent" style={{ fontSize: 11 }}>{data.short}</span>}
-              </h1>
-              <p className="page-sub">{headInfo.sub}</p>
-            </div>
-            <div className="page-actions">
-              <button className="btn"><Icon name="external" size={15} />Exportar</button>
-            </div>
-          </div>
+        {/* APP */}
+        <div className="app">
+          <header className="header">
+            <h1>{headInfo.title}</h1>
+            {data && <span className="badge">{data.short}</span>}
+            {headInfo.sub && <span className="subtitle">{headInfo.sub}</span>}
+            <span className="spacer" />
+            <button className="btn"><Icon name="external" size={15} />Exportar</button>
+          </header>
 
-          <div className="screen-host">
-            {loading && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-3)", fontSize: 14 }}>
-                <Icon name="activity" size={20} className="spin" style={{ marginRight: 10 }} />Carregando…
-              </div>
-            )}
-            {error && (
-              <div style={{ padding: 40, color: "var(--crit-text)", fontSize: 13 }}>
-                <Icon name="alert" size={16} style={{ marginRight: 8 }} />Erro ao carregar: {error}
-              </div>
-            )}
-            {!loading && !error && data && (
-              <>
-                {screen === "explorer"  && <ExplorerScreen  key={moduleKey} data={data} filters={filters} onFiltersChange={handleFiltersChange} />}
-                {screen === "variants"  && <VariantsScreen  key={moduleKey} data={data} />}
-                {screen === "dashboard" && <DashboardScreen key={moduleKey} data={data} onDrill={openDrill} />}
-              </>
-            )}
-          </div>
-        </main>
+          {loading && (
+            <div style={{ display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 14 }}>
+              <span><Icon name="activity" size={18} className="spin" style={{ marginRight: 8, verticalAlign: -3 }} />Carregando…</span>
+            </div>
+          )}
+          {error && !loading && (
+            <div style={{ padding: 40, color: "var(--crit)", fontSize: 13 }}>
+              <Icon name="alert" size={16} style={{ marginRight: 8, verticalAlign: -3 }} />Erro ao carregar: {error}
+            </div>
+          )}
+          {!loading && !error && data && (
+            <>
+              {screen === "explorer" && <ExplorerScreen key={moduleKey} data={data} filters={filters} onFiltersChange={onFiltersChange} />}
+              {screen === "variants" && <div className="screen-fill"><VariantsScreen key={moduleKey} data={data} /></div>}
+              {screen === "dashboard" && <div className="screen-fill" style={{ overflowY: "auto" }}><DashboardScreen key={moduleKey} data={data} onDrill={openDrill} /></div>}
+            </>
+          )}
+        </div>
       </div>
 
       {drill && <DrillDrawer drill={drill} onClose={() => setDrill(null)} />}
