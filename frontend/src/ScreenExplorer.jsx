@@ -105,27 +105,31 @@ function Graph({ graphData, mode, zoom, pan, dragging, animKey }) {
     setBypasses(out);
   }, [graphData, mode, zoom, primary.join(",")]);
 
-  const D = 60; // ms entre cada passo da cascata
-  const dl = (i) => ({ animationDelay: `${i * D}ms` });
-  const lastIdx = 2 + primary.length * 2; // índice do FIM
-
   return (
-    <div className="graph" key={animKey} ref={graphRef}
+    <div className="graph" ref={graphRef}
       style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transition: dragging ? "none" : undefined }}>
-      <svg className="bypass-svg flow-in" style={{ animationDelay: `${(lastIdx + 1) * D}ms` }}>
-        {bypasses.map((b) => (
-          <g key={b.id}>
-            <path className="bypass-path" d={b.d} />
-            <g transform={`translate(${b.lx}, ${b.ly})`}>
-              <rect className="pill-bg" x="-30" y="-12" width="60" height="24" rx="7" />
-              <text className="bypass-label" x="0" y="1" textAnchor="middle" dominantBaseline="middle" fill="#8b6fe8">{b.label}</text>
+      <svg className="bypass-svg">
+        <defs>
+          {/* máscara que cresce de cima p/ baixo, "desenhando" os desvios */}
+          <clipPath id={`reveal-${animKey}`}>
+            <rect className="reveal-rect" x="-600" y="-60" width="3000" height="0" />
+          </clipPath>
+        </defs>
+        <g clipPath={`url(#reveal-${animKey})`}>
+          {bypasses.map((b) => (
+            <g key={b.id}>
+              <path className="bypass-path" d={b.d} />
+              <g transform={`translate(${b.lx}, ${b.ly})`}>
+                <rect className="pill-bg" x="-30" y="-12" width="60" height="24" rx="7" />
+                <text className="bypass-label" x="0" y="1" textAnchor="middle" dominantBaseline="middle" fill="#8b6fe8">{b.label}</text>
+              </g>
             </g>
-          </g>
-        ))}
+          ))}
+        </g>
       </svg>
 
-      <div className="terminal flow-in" style={dl(0)}><span className="tdot" style={{ background: "#16a34a" }} />INÍCIO</div>
-      <div className="edge tiny flow-in" style={dl(1)}><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
+      <div className="terminal"><span className="tdot" style={{ background: "#16a34a" }} />INÍCIO</div>
+      <div className="edge tiny"><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
 
       {primary.map((id, i) => {
         const node = nodeById[id];
@@ -134,7 +138,7 @@ function Graph({ graphData, mode, zoom, pan, dragging, animKey }) {
         const vEdge = nextId ? edgeById[`${id}->${nextId}`] : null;
         return (
           <div key={id} style={{ display: "contents" }}>
-            <div className="node flow-in" style={dl(2 + i * 2)} ref={(el) => { nodeRefs.current[id] = el; }}>
+            <div className="node" ref={(el) => { nodeRefs.current[id] = el; }}>
               <div className="node-accent" style={{ background: freqColor(ratio) }} />
               <div className="node-body">
                 <div className="node-title">{node.label}</div>
@@ -145,7 +149,7 @@ function Graph({ graphData, mode, zoom, pan, dragging, animKey }) {
               </div>
             </div>
             {nextId && (
-              <div className={"edge flow-in" + (vEdge?.bottleneck ? " bottleneck" : "")} style={dl(3 + i * 2)}>
+              <div className={"edge" + (vEdge?.bottleneck ? " bottleneck" : "")}>
                 <div className="edge-track" style={{ "--flow": vEdge?.bottleneck ? "#e5484d" : freqColor(0.6 + (vEdge ? vEdge.cases / graphData.totalCases : 0) * 0.4) }} />
                 <span className="edge-label">{vEdge ? (mode === "fluxo" ? vEdge.time : fmt(vEdge.cases)) : "—"}</span>
               </div>
@@ -154,8 +158,8 @@ function Graph({ graphData, mode, zoom, pan, dragging, animKey }) {
         );
       })}
 
-      <div className="edge tiny flow-in" style={dl(lastIdx - 1)}><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
-      <div className="terminal end flow-in" style={dl(lastIdx)}><span className="tdot" />FIM</div>
+      <div className="edge tiny"><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
+      <div className="terminal end"><span className="tdot" />FIM</div>
     </div>
   );
 }
