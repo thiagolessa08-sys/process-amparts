@@ -61,7 +61,7 @@ function Donut({ pct }) {
 }
 
 /* ───────── Graph (fluxo vertical) ───────── */
-function Graph({ graphData, mode, zoom, pan, dragging }) {
+function Graph({ graphData, mode, zoom, pan, dragging, animKey }) {
   const graphRef = useRef(null);
   const nodeRefs = useRef({});
   const [bypasses, setBypasses] = useState([]);
@@ -105,9 +105,14 @@ function Graph({ graphData, mode, zoom, pan, dragging }) {
     setBypasses(out);
   }, [graphData, mode, zoom, primary.join(",")]);
 
+  const D = 60; // ms entre cada passo da cascata
+  const dl = (i) => ({ animationDelay: `${i * D}ms` });
+  const lastIdx = 2 + primary.length * 2; // índice do FIM
+
   return (
-    <div className="graph" ref={graphRef} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transition: dragging ? "none" : undefined }}>
-      <svg className="bypass-svg">
+    <div className="graph" key={animKey} ref={graphRef}
+      style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transition: dragging ? "none" : undefined }}>
+      <svg className="bypass-svg flow-in" style={{ animationDelay: `${(lastIdx + 1) * D}ms` }}>
         {bypasses.map((b) => (
           <g key={b.id}>
             <path className="bypass-path" d={b.d} />
@@ -119,8 +124,8 @@ function Graph({ graphData, mode, zoom, pan, dragging }) {
         ))}
       </svg>
 
-      <div className="terminal"><span className="tdot" style={{ background: "#16a34a" }} />INÍCIO</div>
-      <div className="edge tiny"><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
+      <div className="terminal flow-in" style={dl(0)}><span className="tdot" style={{ background: "#16a34a" }} />INÍCIO</div>
+      <div className="edge tiny flow-in" style={dl(1)}><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
 
       {primary.map((id, i) => {
         const node = nodeById[id];
@@ -129,7 +134,7 @@ function Graph({ graphData, mode, zoom, pan, dragging }) {
         const vEdge = nextId ? edgeById[`${id}->${nextId}`] : null;
         return (
           <div key={id} style={{ display: "contents" }}>
-            <div className="node" ref={(el) => { nodeRefs.current[id] = el; }}>
+            <div className="node flow-in" style={dl(2 + i * 2)} ref={(el) => { nodeRefs.current[id] = el; }}>
               <div className="node-accent" style={{ background: freqColor(ratio) }} />
               <div className="node-body">
                 <div className="node-title">{node.label}</div>
@@ -140,7 +145,7 @@ function Graph({ graphData, mode, zoom, pan, dragging }) {
               </div>
             </div>
             {nextId && (
-              <div className={"edge" + (vEdge?.bottleneck ? " bottleneck" : "")}>
+              <div className={"edge flow-in" + (vEdge?.bottleneck ? " bottleneck" : "")} style={dl(3 + i * 2)}>
                 <div className="edge-track" style={{ "--flow": vEdge?.bottleneck ? "#e5484d" : freqColor(0.6 + (vEdge ? vEdge.cases / graphData.totalCases : 0) * 0.4) }} />
                 <span className="edge-label">{vEdge ? (mode === "fluxo" ? vEdge.time : fmt(vEdge.cases)) : "—"}</span>
               </div>
@@ -149,8 +154,8 @@ function Graph({ graphData, mode, zoom, pan, dragging }) {
         );
       })}
 
-      <div className="edge tiny"><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
-      <div className="terminal end"><span className="tdot" />FIM</div>
+      <div className="edge tiny flow-in" style={dl(lastIdx - 1)}><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
+      <div className="terminal end flow-in" style={dl(lastIdx)}><span className="tdot" />FIM</div>
     </div>
   );
 }
@@ -323,7 +328,8 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
           style={{ cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}
           onPointerDown={onPointerDown} onPointerMove={onPointerMove}
           onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
-          <Graph graphData={graphData} mode={mode} zoom={zoom} pan={pan} dragging={dragging} />
+          <Graph graphData={graphData} mode={mode} zoom={zoom} pan={pan} dragging={dragging}
+            animKey={[...selectedIds].sort().join(",")} />
         </div>
 
         <div className="legend">
