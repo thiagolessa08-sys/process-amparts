@@ -1,25 +1,34 @@
-"""Mantem qual event log esta ativo. Por padrao, o dataset demo P2P.
+"""Mantem qual event log esta ativo por módulo.
 
-Ao receber upload, aponta para o arquivo enviado. Centraliza o acesso
-para que os endpoints nao saibam de onde o log vem.
+Por padrão usa o dataset demo do módulo solicitado.
 """
 from pathlib import Path
 
 import pandas as pd
 
 from app.connectors.csv_connector import CSVConnector
-from app.demo.generate_p2p import write_demo_csv
+from app.demo.generate_p2p import write_demo_csv as write_p2p
+from app.demo.generate_o2c import write_demo_csv as write_o2c
 
-DEMO_PATH = "data/demo_p2p.csv"
+DEMO_PATHS = {
+    "p2p": "data/demo_p2p.csv",
+    "o2c": "data/demo_o2c.csv",
+}
+DEMO_WRITERS = {
+    "p2p": write_p2p,
+    "o2c": write_o2c,
+}
 
-_state = {"path": None}
+_state = {"path": None}   # override manual (upload)
 
 
-def get_log() -> pd.DataFrame:
-    path = _state["path"] or DEMO_PATH
-    if not Path(path).exists():
-        write_demo_csv(DEMO_PATH)
-        path = DEMO_PATH
+def get_log(module_key: str = "p2p") -> pd.DataFrame:
+    path = _state["path"]
+    if path is None:
+        demo = DEMO_PATHS.get(module_key, DEMO_PATHS["p2p"])
+        if not Path(demo).exists():
+            DEMO_WRITERS[module_key](demo)
+        path = demo
     return CSVConnector(path).load()
 
 

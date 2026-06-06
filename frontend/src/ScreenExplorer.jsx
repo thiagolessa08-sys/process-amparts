@@ -12,7 +12,11 @@ function freqColor(t) {
   return `oklch(${L} ${C} 295)`;
 }
 
-const IDEAL_ORDER = ["req", "po", "approve", "goods", "invoice", "pay"];
+// ordem ideal por módulo — usada para montar o caminho vertical do grafo
+const IDEAL_BY_MODULE = {
+  p2p: ["req", "po", "alter", "approve", "goods", "invoice", "pay"],
+  o2c: ["order", "credit", "hold", "pick", "deliver", "invoice", "receive"],
+};
 
 /* ───────── subgrafo da união das variantes selecionadas ───────── */
 function buildSubgraph(data, selectedIds) {
@@ -61,15 +65,16 @@ function Donut({ pct }) {
 }
 
 /* ───────── Graph (fluxo vertical) ───────── */
-function Graph({ graphData, mode, zoom, pan, dragging, animKey }) {
+function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey }) {
   const graphRef = useRef(null);
   const nodeRefs = useRef({});
   const [bypasses, setBypasses] = useState([]);
 
   const primary = useMemo(() => {
+    const order   = IDEAL_BY_MODULE[moduleKey] || IDEAL_BY_MODULE.p2p;
     const present = new Set(graphData.nodes.map((n) => n.id));
-    return IDEAL_ORDER.filter((id) => present.has(id));
-  }, [graphData]);
+    return order.filter((id) => present.has(id));
+  }, [graphData, moduleKey]);
 
   const nodeById = useMemo(() => Object.fromEntries(graphData.nodes.map((n) => [n.id, n])), [graphData]);
   const edgeById = useMemo(() => Object.fromEntries(graphData.edges.map((e) => [e.id, e])), [graphData]);
@@ -337,7 +342,7 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
           onPointerDown={onPointerDown} onPointerMove={onPointerMove}
           onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
           <Graph graphData={graphData} mode={mode} zoom={zoom} pan={pan} dragging={dragging}
-            animKey={[...selectedIds].sort().join(",")} />
+            animKey={[...selectedIds].sort().join(",")} moduleKey={data.key} />
         </div>
 
         <div className="legend">

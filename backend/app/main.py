@@ -85,7 +85,7 @@ def get_module(
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
-    log = data_source.get_log()
+    log = data_source.get_log(module_key=key)
     log = _apply_filters(log, fornecedores, start_date, end_date)
     if log.empty or log[CASE_ID].nunique() == 0:
         raise HTTPException(status_code=422, detail="Nenhum caso encontrado para os filtros aplicados")
