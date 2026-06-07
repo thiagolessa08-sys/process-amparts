@@ -118,26 +118,35 @@ function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey, playi
     if (!playingVariant) { setTrace(null); return; }
     const s = startRef.current, e = endRef.current;
     if (!s || !e) { setTrace(null); return; }
-    const center = (el) => ({ cx: el.offsetLeft + el.offsetWidth / 2, cy: el.offsetTop + el.offsetHeight / 2 });
+    // âncoras: cx = centro (linha vertical sobre as setas); lx = borda esquerda
+    // (mesmo ponto de saída/entrada usado pelas curvas tracejadas de bypass)
+    const anchor = (el) => ({
+      cx: el.offsetLeft + el.offsetWidth / 2,
+      lx: el.offsetLeft + 14,
+      my: el.offsetTop + el.offsetHeight / 2,
+    });
     const pathIds = playingVariant.path.filter((id) => nodeRefs.current[id]);
     if (pathIds.length === 0) { setTrace(null); return; }
 
-    const sc = center(s);
-    let d = `M ${sc.cx} ${sc.cy}`;
+    const sc = anchor(s);
+    let d = `M ${sc.cx} ${sc.my}`;
     let prev = sc, prevOrd = -1;
     for (let i = 0; i < pathIds.length; i++) {
-      const { cx, cy } = center(nodeRefs.current[pathIds[i]]);
+      const a = anchor(nodeRefs.current[pathIds[i]]);
       const ord = primary.indexOf(pathIds[i]);
       if (i === 0 || ord === prevOrd + 1) {
-        d += ` L ${cx} ${cy}`;
+        d += ` L ${a.cx} ${a.my}`; // trecho reto, pelo centro
       } else {
-        const bow = Math.min(prev.cx, cx) - 80; // desvio: volta pela esquerda
-        d += ` C ${bow} ${prev.cy}, ${bow} ${cy}, ${cx} ${cy}`;
+        // desvio: reproduz exatamente a curva tracejada (borda esquerda, mesmo bow)
+        const bow = Math.min(prev.lx, a.lx) - 66;
+        d += ` L ${prev.lx} ${prev.my}`;                                  // conector (atrás do card)
+        d += ` C ${bow} ${prev.my}, ${bow} ${a.my}, ${a.lx} ${a.my}`;     // curva = tracejada
+        d += ` L ${a.cx} ${a.my}`;                                        // conector (atrás do card)
       }
-      prev = { cx, cy }; prevOrd = ord;
+      prev = a; prevOrd = ord;
     }
-    const ec = center(e);
-    d += ` L ${ec.cx} ${ec.cy}`;
+    const ec = anchor(e);
+    d += ` L ${ec.cx} ${ec.my}`;
     setTrace(d);
   }, [playingVariant, replayKey, graphData, zoom, primary.join(",")]);
 

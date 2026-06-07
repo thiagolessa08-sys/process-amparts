@@ -521,6 +521,7 @@
     box-shadow: var(--shadow-card);
     overflow: hidden;
     position: relative;
+    z-index: 2; /* acima do traço (.bypass-svg) — esconde os conectores dentro do card */
     cursor: pointer;
     transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
   }
