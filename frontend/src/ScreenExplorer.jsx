@@ -65,10 +65,13 @@ function Donut({ pct }) {
 }
 
 /* ───────── Graph (fluxo vertical) ───────── */
-function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey }) {
+function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey, playingVariant, replayKey }) {
   const graphRef = useRef(null);
   const nodeRefs = useRef({});
+  const startRef = useRef(null);
+  const endRef = useRef(null);
   const [bypasses, setBypasses] = useState([]);
+  const [trace, setTrace] = useState(null);
 
   const primary = useMemo(() => {
     const order   = IDEAL_BY_MODULE[moduleKey] || IDEAL_BY_MODULE.p2p;
@@ -110,6 +113,34 @@ function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey }) {
     setBypasses(out);
   }, [graphData, mode, zoom, primary.join(",")]);
 
+  // traço do caminho da variante reproduzida: INÍCIO -> nós (na ordem) -> FIM
+  useLayoutEffect(() => {
+    if (!playingVariant) { setTrace(null); return; }
+    const s = startRef.current, e = endRef.current;
+    if (!s || !e) { setTrace(null); return; }
+    const center = (el) => ({ cx: el.offsetLeft + el.offsetWidth / 2, cy: el.offsetTop + el.offsetHeight / 2 });
+    const pathIds = playingVariant.path.filter((id) => nodeRefs.current[id]);
+    if (pathIds.length === 0) { setTrace(null); return; }
+
+    const sc = center(s);
+    let d = `M ${sc.cx} ${sc.cy}`;
+    let prev = sc, prevOrd = -1;
+    for (let i = 0; i < pathIds.length; i++) {
+      const { cx, cy } = center(nodeRefs.current[pathIds[i]]);
+      const ord = primary.indexOf(pathIds[i]);
+      if (i === 0 || ord === prevOrd + 1) {
+        d += ` L ${cx} ${cy}`;
+      } else {
+        const bow = Math.min(prev.cx, cx) - 80; // desvio: volta pela esquerda
+        d += ` C ${bow} ${prev.cy}, ${bow} ${cy}, ${cx} ${cy}`;
+      }
+      prev = { cx, cy }; prevOrd = ord;
+    }
+    const ec = center(e);
+    d += ` L ${ec.cx} ${ec.cy}`;
+    setTrace(d);
+  }, [playingVariant, replayKey, graphData, zoom, primary.join(",")]);
+
   return (
     <div className="graph" ref={graphRef}
       style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transition: dragging ? "none" : undefined }}>
@@ -135,9 +166,12 @@ function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey }) {
             </g>
           ))}
         </g>
+        {trace && (
+          <path key={replayKey} className="variant-trace" pathLength="1" d={trace} />
+        )}
       </svg>
 
-      <div className="terminal"><span className="tdot" style={{ background: "#16a34a" }} />INÍCIO</div>
+      <div className="terminal" ref={startRef}><span className="tdot" style={{ background: "#16a34a" }} />INÍCIO</div>
       <div className="edge tiny"><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
 
       {primary.map((id, i) => {
@@ -168,7 +202,7 @@ function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey }) {
       })}
 
       <div className="edge tiny"><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
-      <div className="terminal end"><span className="tdot" />FIM</div>
+      <div className="terminal end" ref={endRef}><span className="tdot" />FIM</div>
     </div>
   );
 }
@@ -204,6 +238,8 @@ export function DrillDrawer({ drill, onClose }) {
 /* ───────── Explorer screen ───────── */
 export function ExplorerScreen({ data, filters, onFiltersChange }) {
   const [selectedIds, setSelectedIds] = useState(() => defaultSelection(data.variants));
+  const [playingId, setPlayingId] = useState(null);
+  const [replayKey, setReplayKey] = useState(0);
   const [mode, setMode] = useState("fluxo");
   const [zoom, setZoom] = useState(0.92);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -229,9 +265,21 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
   const [startDate, setStartDate] = useState(filters?.startDate ?? "");
   const [endDate, setEndDate]     = useState(filters?.endDate ?? "");
 
-  useEffect(() => { setSelectedIds(defaultSelection(data.variants)); }, [data]);
+  useEffect(() => { setSelectedIds(defaultSelection(data.variants)); setPlayingId(null); }, [data]);
 
-  const graphData = useMemo(() => buildSubgraph(data, selectedIds), [data, selectedIds]);
+  // a variante reproduzida entra no grafo mesmo que não esteja selecionada
+  const effectiveIds = useMemo(() => {
+    if (playingId == null) return selectedIds;
+    const next = new Set(selectedIds); next.add(playingId); return next;
+  }, [selectedIds, playingId]);
+  const graphData = useMemo(() => buildSubgraph(data, effectiveIds), [data, effectiveIds]);
+  const playingVariant = useMemo(() => data.variants.find((v) => v.id === playingId) || null, [data, playingId]);
+
+  function playVariant(id) {
+    if (playingId === id) { setPlayingId(null); return; } // ■ stop / limpa
+    setPlayingId(id);
+    setReplayKey((k) => k + 1);
+  }
   const selVars = data.variants.filter((v) => selectedIds.has(v.id));
   const selCases = selVars.reduce((s, v) => s + v.cases, 0);
   const coveragePct = (selCases / data.totalCases) * 100;
@@ -306,7 +354,7 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
           {data.variants.map((v, i) => {
             const sel = selectedIds.has(v.id);
             return (
-              <div key={v.id} className={"vrow" + (sel ? " sel" : "")} onClick={() => toggle(v.id)}>
+              <div key={v.id} className={"vrow" + (sel ? " sel" : "") + (playingId === v.id ? " playing" : "")} onClick={() => toggle(v.id)}>
                 <div className="cbx"><Icon name="check" size={12} strokeWidth={3.5} /></div>
                 <div className="vname"><span className="hash">#</span>{i + 1}</div>
                 <div className="vcases mono">{fmt(v.cases)}</div>
@@ -315,6 +363,10 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
                   <div className="bar"><i style={{ width: Math.min(100, v.pct / maxCov * 100) + "%" }} /></div>
                 </div>
                 <div className="vtpt mono">{v.avgDur}</div>
+                <button className="vplay" title={playingId === v.id ? "Parar" : "Reproduzir caminho"}
+                  onClick={(e) => { e.stopPropagation(); playVariant(v.id); }}>
+                  <Icon name={playingId === v.id ? "stop" : "play"} size={12} />
+                </button>
               </div>
             );
           })}
@@ -342,7 +394,8 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
           onPointerDown={onPointerDown} onPointerMove={onPointerMove}
           onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
           <Graph graphData={graphData} mode={mode} zoom={zoom} pan={pan} dragging={dragging}
-            animKey={[...selectedIds].sort().join(",")} moduleKey={data.key} />
+            animKey={[...selectedIds].sort().join(",")} moduleKey={data.key}
+            playingVariant={playingVariant} replayKey={replayKey} />
         </div>
 
         <div className="legend">

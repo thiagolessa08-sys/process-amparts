@@ -32,6 +32,7 @@ export function Icon({ name, size = 16, style, className, strokeWidth = 1.7 }) {
     arrowDown: <path d="M12 5v14M6 13l6 6 6-6"/>,
     external: <><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></>,
     play: <path d="M7 4v16l13-8z"/>,
+    stop: <rect x="6" y="6" width="12" height="12" rx="2"/>,
     layers: <><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5M2 18l10 5 10-5"/></>,
     flag: <><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></>,
     dots: <><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></>,

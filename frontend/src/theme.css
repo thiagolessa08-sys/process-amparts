@@ -318,7 +318,7 @@
   /* variant table */
   .vt-head {
     display: grid;
-    grid-template-columns: 24px 1fr 46px 58px 50px;
+    grid-template-columns: 24px 1fr 46px 58px 50px 22px;
     gap: 9px;
     align-items: end;
     padding: 0 4px 8px;
@@ -335,7 +335,7 @@
 
   .vrow {
     display: grid;
-    grid-template-columns: 24px 1fr 46px 58px 50px;
+    grid-template-columns: 24px 1fr 46px 58px 50px 22px;
     gap: 9px;
     align-items: center;
     padding: 9px 4px;
@@ -346,6 +346,37 @@
   }
   .vrow:hover { background: var(--hover); }
   .vrow.sel { background: var(--violet-50); }
+
+  /* botão reproduzir caminho da variante */
+  .vplay {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border: none; background: transparent;
+    color: var(--faint);
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .12s, background .12s, color .12s;
+  }
+  .vrow:hover .vplay { opacity: .85; }
+  .vplay:hover { background: var(--violet-50); color: var(--violet); }
+  .vrow.playing .vplay { opacity: 1; color: var(--violet); background: var(--violet-50); }
+
+  /* linha luminosa do caminho reproduzido (desenha 2x e fica acesa) */
+  .variant-trace {
+    fill: none;
+    stroke: var(--violet);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 5px rgba(123, 84, 238, .7));
+    stroke-dasharray: 1;
+    animation: traceDraw 1.05s cubic-bezier(.4, .1, .3, 1) 2 both;
+  }
+  @keyframes traceDraw {
+    from { stroke-dashoffset: 1; }
+    to   { stroke-dashoffset: 0; }
+  }
 
   /* checkbox */
   .cbx {
