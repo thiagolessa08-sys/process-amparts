@@ -30,7 +30,15 @@ HAPPY_PATH = [
 CLIENTES = [
     "Atacadao Vale", "Distribuidora Sul", "Mercantil Centro",
     "RedeMix Varejo", "Comercial Norte", "Rede Sul Varejo",
+    "Super Leste", "Grupo Aurora", "Mega Atacado", "Casa & Cia",
+    "Varejo Total", "Hiper Bom Preco", "Rede Primavera", "Lojas Unidas",
 ]
+
+# códigos de produto sintéticos
+PRODUTOS = (
+    [f"PI{n:06d}" for n in range(200, 224)] +
+    [f"PA{n:06d}" for n in range(200, 224)]
+)
 CATEGORIAS = [
     "Eletronicos", "Alimentos", "Vestuario",
     "Moveis", "Ferramentas", "Material de Construcao",
@@ -89,20 +97,22 @@ def _build_path(rng: random.Random) -> tuple[list[str], str]:
 def build_o2c_log(n_cases: int = 2000, seed: int = 13) -> pd.DataFrame:
     rng  = random.Random(seed)
     rows = []
-    base = pd.Timestamp("2026-01-01 08:00:00")
+    base = pd.Timestamp("2024-12-01 08:00:00")  # ~17 meses de histórico
 
     for case_idx in range(1, n_cases + 1):
         case_id  = 7700000 + case_idx
         path, vtype = _build_path(rng)
 
         cliente    = rng.choice(CLIENTES)
+        produto    = rng.choice(PRODUTOS)
+        cancelado  = vtype == "cancelamento" or rng.random() < 0.10
         valor      = round(rng.uniform(8_000, 600_000), 2)
         itens      = rng.randint(50, 5_000)
         categoria  = rng.choice(CATEGORIAS)
         prazo_rec  = rng.choice([30, 45, 60])  # dias para receber pagamento
         late_recv  = vtype == "late_recv"
 
-        t = base + pd.Timedelta(days=rng.randint(0, 150))
+        t = base + pd.Timedelta(days=rng.randint(0, 510))
         entrega_ts = None
         fatura_ts  = None
         path_rows  = []
@@ -125,6 +135,8 @@ def build_o2c_log(n_cases: int = 2000, seed: int = 13) -> pd.DataFrame:
                 TIMESTAMP:           t,
                 RESOURCE:            rng.choice(RESOURCES),
                 "cliente":           cliente,
+                "produto":           produto,
+                "cancelado":         cancelado,
                 "valor":             valor,
                 "itens":             itens,
                 "categoria":         categoria,

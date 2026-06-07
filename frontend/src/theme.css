@@ -363,6 +363,103 @@
   .shell.dark .kpi.pedidos { --kpi-num: #ffd9a3; }
   .shell.dark .kpi.value { --kpi-num: #b9f0e9; }
 
+  /* ============ Visão Geral (overview) ============ */
+  .overview { background: var(--bg); padding: 18px 20px 22px; }
+  .ov-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: minmax(312px, auto);
+    gap: 16px;
+    max-width: 1640px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
+    padding: 16px 18px 14px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .panel-head .pt { font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+  .panel-head .pi {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: grid; place-items: center; flex-shrink: 0;
+    background: var(--violet-100); color: var(--violet);
+  }
+  .panel-head .pi svg { width: 15px; height: 15px; }
+  .panel-head .ph-spacer { flex: 1; }
+  .panel-head .ph-meta {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    font-family: "JetBrains Mono", monospace;
+    background: var(--chip); border-radius: 6px; padding: 3px 8px;
+  }
+  .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+  /* dot plot — TOP Produtos */
+  .dotplot { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .dprow { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 10px; height: 26px; }
+  .dprow .dpl {
+    font-family: "JetBrains Mono", monospace; font-size: 11.5px; font-weight: 500;
+    color: var(--ink-2); text-align: right; white-space: nowrap;
+  }
+  .dptrack { position: relative; height: 100%; border-left: 1px dashed var(--line); }
+  .dptrack::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dotted var(--line-2); }
+  .dpdot {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 13px; height: 13px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #8fb4ff, #5b8def);
+    border: 1.5px solid var(--panel);
+    box-shadow: 0 2px 6px -1px rgba(91,141,239,.55);
+    cursor: pointer; transition: transform .12s ease;
+  }
+  .dpdot:hover { transform: translate(-50%, -50%) scale(1.25); }
+  .dpaxis { display: grid; grid-template-columns: 84px 1fr; gap: 10px; margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); }
+  .dpticks { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); font-family: "JetBrains Mono", monospace; }
+
+  /* horizontal bars — Cancelados por Mês */
+  .hbars { display: flex; flex-direction: column; gap: 4px; flex: 1; justify-content: center; }
+  .hbrow { display: grid; grid-template-columns: 56px 1fr 44px; align-items: center; gap: 9px; height: 17px; }
+  .hbl { font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 500; color: var(--ink-2); text-align: right; }
+  .hbtrack { height: 11px; background: var(--line-2); border-radius: 4px; overflow: hidden; }
+  .hbfill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #f7b8d6, #ef8fc0); transition: width .5s cubic-bezier(.2,.7,.3,1); }
+  .hbv { font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 600; color: var(--muted); text-align: right; }
+  .hbaxis { display: grid; grid-template-columns: 56px 1fr 44px; gap: 9px; margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); }
+  .hbticks { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); font-family: "JetBrains Mono", monospace; }
+
+  /* donut — TOP Clientes */
+  .clients { display: flex; align-items: center; gap: 18px; flex: 1; }
+  .clients-donut { flex-shrink: 0; }
+  .clients-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; align-content: center; flex: 1; }
+  .lchip { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-2); font-weight: 500; }
+  .lchip .sw { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .lchip .lc { font-family: "JetBrains Mono", monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lchip .lp { margin-left: auto; color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: 11px; }
+  .lchip.more { color: var(--violet); font-weight: 600; }
+
+  /* table — Pedidos x Nota Fiscal */
+  .nf-wrap { overflow: auto; flex: 1; min-height: 0; }
+  .nf-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+  .nf-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+  .nf-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .nf-table thead th {
+    text-align: right; font-weight: 700; color: var(--faint);
+    font-size: 10.5px; letter-spacing: 0.03em; text-transform: uppercase;
+    padding: 0 10px 9px; border-bottom: 1px solid var(--line); white-space: nowrap;
+    position: sticky; top: 0; background: var(--panel);
+  }
+  .nf-table thead th:first-child { text-align: left; }
+  .nf-table tbody td {
+    text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line-2);
+    font-family: "JetBrains Mono", monospace; color: var(--ink-2); white-space: nowrap;
+  }
+  .nf-table tbody td:first-child { text-align: left; font-weight: 600; color: var(--ink); font-family: inherit; }
+  .nf-table tbody tr:hover { background: var(--hover); }
+  .nf-table .accent { color: var(--violet); font-weight: 600; }
+
   /* ============ Body split ============ */
   .body {
     display: grid;

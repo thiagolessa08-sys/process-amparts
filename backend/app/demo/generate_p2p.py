@@ -32,7 +32,15 @@ HAPPY_PATH = [
 FORNECEDORES = [
     "Tecnomec Industria", "Vega Componentes", "Alianca Logistica",
     "Polimix Quimica", "Brasmetal S.A.", "Norte Suprimentos",
+    "Forte Aco", "Delta Plasticos", "Sigma Eletro", "Andrade Pecas",
+    "Uniao Quimica", "Prima Embalagens", "Centro Oeste Insumos", "Atlas Ferragens",
 ]
+
+# códigos de produto sintéticos (PI = importado, PA = nacional)
+PRODUTOS = (
+    [f"PI{rng_n:06d}" for rng_n in range(100, 124)] +
+    [f"PA{rng_n:06d}" for rng_n in range(100, 124)]
+)
 
 CATEGORIAS = [
     "Materia-prima", "Servicos de TI", "Logistica",
@@ -77,13 +85,15 @@ def _build_path(rng: random.Random) -> tuple[list[str], str]:
 def build_p2p_log(n_cases: int = 2000, seed: int = 7) -> pd.DataFrame:
     rng   = random.Random(seed)
     rows  = []
-    base  = pd.Timestamp("2026-01-01 08:00:00")
+    base  = pd.Timestamp("2024-12-01 08:00:00")  # ~17 meses de histórico
 
     for case_idx in range(1, n_cases + 1):
         case_id   = 4500000 + case_idx
         path, vtype = _build_path(rng)
 
         fornecedor   = rng.choice(FORNECEDORES)
+        produto      = rng.choice(PRODUTOS)
+        cancelado    = rng.random() < 0.12
         valor        = round(rng.uniform(5_000, 500_000), 2)
         itens        = rng.randint(50, 5_000)
         documento    = f"NF {rng.randint(10000, 99999)}"
@@ -93,7 +103,7 @@ def build_p2p_log(n_cases: int = 2000, seed: int = 7) -> pd.DataFrame:
         # pagamento tardio em ~25% dos casos onde há fatura
         late_pay = vtype not in ("maverick",) and rng.random() < 0.25
 
-        t          = base + pd.Timedelta(days=rng.randint(0, 150))
+        t          = base + pd.Timedelta(days=rng.randint(0, 510))
         fatura_ts  = None
         path_rows  = []
 
@@ -114,6 +124,8 @@ def build_p2p_log(n_cases: int = 2000, seed: int = 7) -> pd.DataFrame:
                 TIMESTAMP:      t,
                 RESOURCE:       rng.choice(RESOURCES),
                 "fornecedor":   fornecedor,
+                "produto":      produto,
+                "cancelado":    cancelado,
                 "valor":        valor,
                 "itens":        itens,
                 "documento":    documento,
