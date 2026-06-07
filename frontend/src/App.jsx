@@ -7,10 +7,10 @@ import { OverviewScreen } from "./ScreenOverview.jsx";
 import { fetchModule, uploadCsv } from "./api.js";
 
 const SCREENS = [
-  { id: "overview", label: "Visão Geral", icon: "dashboard" },
   { id: "explorer", label: "Explorador", icon: "explorer" },
   { id: "variants", label: "Variantes",  icon: "variants" },
   { id: "dashboard", label: "Dashboard", icon: "activity" },
+  { id: "overview", label: "Visão Geral", icon: "dashboard" },
 ];
 const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "" };
 
