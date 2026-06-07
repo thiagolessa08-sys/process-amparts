@@ -71,6 +71,7 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
       </div>
 
       <div className="ribbon-spacer" />
+      <div className="ribbon-rule" />
 
       {(data.headlineKpis || []).map((k) => (
         <div key={k.id} className={"kpi " + k.accent}>
