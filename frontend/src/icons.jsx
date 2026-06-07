@@ -42,6 +42,8 @@ export function Icon({ name, size = 16, style, className, strokeWidth = 1.7 }) {
     hash: <><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></>,
     plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
     minus: <line x1="5" y1="12" x2="19" y2="12"/>,
+    dollar: <><line x1="12" y1="2.5" x2="12" y2="21.5"/><path d="M16.5 6.5H9.8a2.8 2.8 0 0 0 0 5.5h4.4a2.8 2.8 0 0 1 0 5.5H7"/></>,
+    trendUp: <><path d="M3 17l6-6 4 4 7-7"/><path d="M17 8h4v4"/></>,
   };
   return <svg {...p}>{paths[name] || null}</svg>;
 }

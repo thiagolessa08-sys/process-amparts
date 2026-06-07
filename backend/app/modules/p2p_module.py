@@ -8,6 +8,7 @@ from app.modules.base import ProcessModule
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.conformance import is_conformant
+from app.modules.headline import headline_kpis, period_filters
 from app.eventlog import CASE_ID, TIMESTAMP
 
 # ── IDs canônicos ──────────────────────────────────────────────────────────────
@@ -189,6 +190,8 @@ class P2PModule(ProcessModule):
         elif "resource" in log.columns:
             dims = sorted(log["resource"].dropna().unique().tolist())[:10]
 
+        period = period_filters(log)
+
         return {
             "key": self.key, "name": self.name,
             "short": self.short, "color": self.color,
@@ -196,11 +199,14 @@ class P2PModule(ProcessModule):
             "dimension": "Fornecedor",
             "nodes": nodes, "edges": edges,
             "variants": variants, "kpis": kpis,
+            "headlineKpis": headline_kpis(log, total_cases),
             "drill": drill,
             "filters": {
                 "variantLabel": "Variante",
                 "dimLabel": "Fornecedor",
                 "dims": dims,
+                "years": period["years"],
+                "months": period["months"],
             },
         }
 

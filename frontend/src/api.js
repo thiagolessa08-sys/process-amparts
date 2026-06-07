@@ -13,6 +13,8 @@ export function fetchModule(key, filters = {}) {
   }
   if (filters.startDate) params.set("start_date", filters.startDate);
   if (filters.endDate)   params.set("end_date",   filters.endDate);
+  if (filters.ano)       params.set("ano", filters.ano);
+  if (filters.mes)       params.set("mes", filters.mes);
   const qs = params.toString();
   return getJson(`/api/modules/${key}${qs ? "?" + qs : ""}`);
 }

@@ -85,6 +85,7 @@ def build_p2p_log(n_cases: int = 2000, seed: int = 7) -> pd.DataFrame:
 
         fornecedor   = rng.choice(FORNECEDORES)
         valor        = round(rng.uniform(5_000, 500_000), 2)
+        itens        = rng.randint(50, 5_000)
         documento    = f"NF {rng.randint(10000, 99999)}"
         comprador    = rng.choice(COMPRADORES)
         categoria    = rng.choice(CATEGORIAS)
@@ -114,6 +115,7 @@ def build_p2p_log(n_cases: int = 2000, seed: int = 7) -> pd.DataFrame:
                 RESOURCE:       rng.choice(RESOURCES),
                 "fornecedor":   fornecedor,
                 "valor":        valor,
+                "itens":        itens,
                 "documento":    documento,
                 "comprador":    comprador,
                 "categoria":    categoria,

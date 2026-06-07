@@ -10,7 +10,89 @@ const SCREENS = [
   { id: "variants", label: "Variantes",  icon: "variants" },
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
 ];
-const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "" };
+const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "" };
+
+/* mini-gráfico do KPI */
+function Spark({ data }) {
+  if (!data?.length) return null;
+  const w = 56, h = 32, min = Math.min(...data), max = Math.max(...data), rng = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / rng) * (h - 5) - 2.5;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return (
+    <svg className="kpi-spark" viewBox={`0 0 ${w} ${h}`} fill="none" preserveAspectRatio="none">
+      <polyline points={pts} style={{ stroke: "var(--kpi-line)" }} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/* uma faixa: título + filtros + KPIs + exportar */
+function Ribbon({ data, headInfo, filters, setFilter }) {
+  const f = data.filters || {};
+  const fornVal = filters.fornecedores?.[0] ?? "";
+  return (
+    <header className="ribbon">
+      <div className="title-block">
+        <div className="title-row">
+          <h1>{headInfo.title}</h1>
+          {data && <span className="badge">{data.short}</span>}
+        </div>
+        {headInfo.sub && <span className="subtitle">{headInfo.sub}</span>}
+      </div>
+      <div className="ribbon-rule" />
+
+      <div className="filter-group">
+        <div className="selectwrap">
+          <span className="lead"><Icon name="calendar" size={14} /></span>
+          <select value={filters.ano} onChange={(e) => setFilter({ ano: e.target.value ? Number(e.target.value) : "" })}>
+            <option value="">Ano do Pedido</option>
+            {(f.years || []).map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <span className="caret"><Icon name="chevronD" size={14} /></span>
+        </div>
+        <div className="selectwrap">
+          <span className="lead"><Icon name="calendar" size={14} /></span>
+          <select value={filters.mes} onChange={(e) => setFilter({ mes: e.target.value ? Number(e.target.value) : "" })}>
+            <option value="">Mês do Pedido</option>
+            {(f.months || []).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+          <span className="caret"><Icon name="chevronD" size={14} /></span>
+        </div>
+        <div className="selectwrap supplier">
+          <span className="lead"><Icon name="truck" size={14} /></span>
+          <select value={fornVal} onChange={(e) => setFilter({ fornecedores: e.target.value ? [e.target.value] : [] })}>
+            <option value="">{data.dimension || f.dimLabel || "Fornecedor"}</option>
+            {(f.dims || []).map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <span className="caret"><Icon name="chevronD" size={14} /></span>
+        </div>
+      </div>
+
+      <div className="ribbon-spacer" />
+
+      {(data.headlineKpis || []).map((k) => (
+        <div key={k.id} className={"kpi " + k.accent}>
+          <div className="kpi-top">
+            <span className="kpi-chip"><Icon name={k.icon} size={15} /></span>
+            <span className="kpi-label">{k.label}</span>
+            <span className={"kpi-delta" + (k.accent === "itens" ? " muted" : "")}>
+              <Icon name="trendUp" size={12} />{k.delta}
+            </span>
+          </div>
+          <div className="kpi-bottom">
+            <div className="kpi-value">{k.value}{k.unit && <span className="unit"> {k.unit}</span>}</div>
+            <Spark data={k.spark} />
+          </div>
+        </div>
+      ))}
+
+      <div className="ribbon-rule" />
+      <button className="btn export-btn"><Icon name="external" size={15} />Exportar</button>
+    </header>
+  );
+}
 
 function useTheme() {
   const [dark, setDark] = useState(() => localStorage.getItem("pm-theme") === "dark");
@@ -57,6 +139,7 @@ export default function App() {
   useEffect(() => { setDrill(null); }, [moduleKey, screen]);
 
   const onFiltersChange = useCallback((f) => { setFilters(f); load(moduleKey, f); }, [moduleKey, load]);
+  const setFilter = useCallback((patch) => { onFiltersChange({ ...filters, ...patch }); }, [filters, onFiltersChange]);
 
   async function onUpload(e) {
     const file = e.target.files[0];
@@ -130,13 +213,13 @@ export default function App() {
 
         {/* APP */}
         <div className="app">
-          <header className="header">
-            <h1>{headInfo.title}</h1>
-            {data && <span className="badge">{data.short}</span>}
-            {headInfo.sub && <span className="subtitle">{headInfo.sub}</span>}
-            <span className="spacer" />
-            <button className="btn"><Icon name="external" size={15} />Exportar</button>
-          </header>
+          {data ? (
+            <Ribbon data={data} headInfo={headInfo} filters={filters} setFilter={setFilter} />
+          ) : (
+            <header className="ribbon">
+              <div className="title-block"><div className="title-row"><h1>{headInfo.title}</h1></div></div>
+            </header>
+          )}
 
           {loading && (
             <div style={{ display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 14 }}>

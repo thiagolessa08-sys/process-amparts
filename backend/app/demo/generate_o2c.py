@@ -97,6 +97,7 @@ def build_o2c_log(n_cases: int = 2000, seed: int = 13) -> pd.DataFrame:
 
         cliente    = rng.choice(CLIENTES)
         valor      = round(rng.uniform(8_000, 600_000), 2)
+        itens      = rng.randint(50, 5_000)
         categoria  = rng.choice(CATEGORIAS)
         prazo_rec  = rng.choice([30, 45, 60])  # dias para receber pagamento
         late_recv  = vtype == "late_recv"
@@ -125,6 +126,7 @@ def build_o2c_log(n_cases: int = 2000, seed: int = 13) -> pd.DataFrame:
                 RESOURCE:            rng.choice(RESOURCES),
                 "cliente":           cliente,
                 "valor":             valor,
+                "itens":             itens,
                 "categoria":         categoria,
                 "prazo_recebimento": prazo_rec,
                 "data_prometida":    None,  # preenchido abaixo

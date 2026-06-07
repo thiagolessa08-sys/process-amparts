@@ -34,10 +34,26 @@ def _apply_filters(
     fornecedores: list[str],
     start_date: Optional[str],
     end_date: Optional[str],
+    ano: Optional[int] = None,
+    mes: Optional[int] = None,
 ) -> pd.DataFrame:
-    """Filtra o event log por fornecedor e/ou período."""
-    if fornecedores and "fornecedor" in log.columns:
-        log = log[log["fornecedor"].isin(fornecedores)]
+    """Filtra o event log por fornecedor/cliente, período e/ou ano e mês do pedido."""
+    if fornecedores:
+        dim = "fornecedor" if "fornecedor" in log.columns else (
+            "cliente" if "cliente" in log.columns else None)
+        if dim:
+            log = log[log[dim].isin(fornecedores)]
+
+    if ano or mes:
+        # filtra pelo ano/mês do primeiro evento do caso (data do pedido)
+        log[TIMESTAMP] = pd.to_datetime(log[TIMESTAMP])
+        case_start = log.groupby(CASE_ID)[TIMESTAMP].min()
+        valid = case_start
+        if ano:
+            valid = valid[valid.dt.year == ano]
+        if mes:
+            valid = valid[valid.dt.month == mes]
+        log = log[log[CASE_ID].isin(valid.index)]
 
     if start_date or end_date:
         # filtra pelo timestamp do primeiro evento do caso (case start date)
@@ -81,12 +97,14 @@ def get_module(
     fornecedores: list[str] = Query(default=[]),
     start_date: Optional[str] = Query(default=None),
     end_date:   Optional[str] = Query(default=None),
+    ano: Optional[int] = Query(default=None),
+    mes: Optional[int] = Query(default=None),
 ):
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
     log = data_source.get_log(module_key=key)
-    log = _apply_filters(log, fornecedores, start_date, end_date)
+    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
     if log.empty or log[CASE_ID].nunique() == 0:
         raise HTTPException(status_code=422, detail="Nenhum caso encontrado para os filtros aplicados")
     return module.enrich(log)
