@@ -11,6 +11,7 @@ from app.mining.conformance import is_conformant
 from app.modules.headline import headline_kpis, period_filters
 from app.modules.overview import overview
 from app.modules.rework import rework
+from app.modules.twomatch import two_match
 from app.eventlog import CASE_ID, TIMESTAMP
 
 # ── IDs canônicos ──────────────────────────────────────────────────────────────
@@ -202,6 +203,7 @@ class O2CModule(ProcessModule):
             "headlineKpis": headline_kpis(log, total_cases),
             "overview": overview(log, "cliente"),
             "rework": rework(log, "cliente", {n["id"]: n["label"] for n in nodes}),
+            "twoMatch": two_match(log, "cliente"),
             "drill": drill,
             "filters": {
                 "variantLabel": "Variante",
