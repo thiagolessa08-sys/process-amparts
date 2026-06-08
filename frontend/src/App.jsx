@@ -53,30 +53,32 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
       </div>
       <div className="ribbon-rule" />
 
-      <div className="filter-group">
-        <div className="selectwrap">
-          <span className="lead"><Icon name="calendar" size={14} /></span>
-          <select value={filters.ano} onChange={(e) => setFilter({ ano: e.target.value ? Number(e.target.value) : "" })}>
-            <option value="">Ano do Pedido</option>
-            {(f.years || []).map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <span className="caret"><Icon name="chevronD" size={14} /></span>
-        </div>
-        <div className="selectwrap">
-          <span className="lead"><Icon name="calendar" size={14} /></span>
-          <select value={filters.mes} onChange={(e) => setFilter({ mes: e.target.value ? Number(e.target.value) : "" })}>
-            <option value="">Mês do Pedido</option>
-            {(f.months || []).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <span className="caret"><Icon name="chevronD" size={14} /></span>
-        </div>
-        <div className="selectwrap supplier">
-          <span className="lead"><Icon name="truck" size={14} /></span>
-          <select value={fornVal} onChange={(e) => setFilter({ fornecedores: e.target.value ? [e.target.value] : [] })}>
-            <option value="">{data.dimension || f.dimLabel || "Fornecedor"}</option>
-            {(f.dims || []).map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <span className="caret"><Icon name="chevronD" size={14} /></span>
+      <div className="filter-col">
+        <div className="filter-group">
+          <div className="selectwrap">
+            <span className="lead"><Icon name="calendar" size={14} /></span>
+            <select value={filters.ano} onChange={(e) => setFilter({ ano: e.target.value ? Number(e.target.value) : "" })}>
+              <option value="">Ano do Pedido</option>
+              {(f.years || []).map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <span className="caret"><Icon name="chevronD" size={14} /></span>
+          </div>
+          <div className="selectwrap">
+            <span className="lead"><Icon name="calendar" size={14} /></span>
+            <select value={filters.mes} onChange={(e) => setFilter({ mes: e.target.value ? Number(e.target.value) : "" })}>
+              <option value="">Mês do Pedido</option>
+              {(f.months || []).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            <span className="caret"><Icon name="chevronD" size={14} /></span>
+          </div>
+          <div className="selectwrap supplier">
+            <span className="lead"><Icon name="truck" size={14} /></span>
+            <select value={fornVal} onChange={(e) => setFilter({ fornecedores: e.target.value ? [e.target.value] : [] })}>
+              <option value="">{data.dimension || f.dimLabel || "Fornecedor"}</option>
+              {(f.dims || []).map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <span className="caret"><Icon name="chevronD" size={14} /></span>
+          </div>
         </div>
 
         {filters.activity && (
