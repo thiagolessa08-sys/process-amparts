@@ -59,8 +59,9 @@
   }
   .main-row {
     display: grid;
-    grid-template-columns: 214px 1fr;
+    grid-template-columns: 64px 1fr;
     min-height: 0;
+    position: relative; /* base p/ o rail recolhível sobrepor o conteúdo */
   }
 
   /* ============ Top bar ============ */
@@ -126,6 +127,8 @@
 
   /* ============ Nav rail ============ */
   .rail {
+    position: absolute; top: 0; bottom: 0; left: 0;
+    width: 64px; z-index: 40;
     background: var(--panel);
     border-right: 1px solid var(--line);
     padding: 16px 12px;
@@ -133,8 +136,17 @@
     flex-direction: column;
     gap: 3px;
     min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
+    white-space: nowrap;
+    transition: width .18s cubic-bezier(.2,.7,.3,1), box-shadow .18s ease;
   }
+  .rail:hover { width: 232px; box-shadow: var(--shadow-pop); }
+  /* recolhido: mostra só os ícones */
+  .rail:not(:hover) .rail-eyebrow { visibility: hidden; }
+  .rail:not(:hover) .metric { display: none; }
+  .rail:not(:hover) .file-card .fn,
+  .rail:not(:hover) .file-card .fs { opacity: 0; }
   .rail-eyebrow {
     font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em;
     color: var(--faint); text-transform: uppercase;
@@ -145,9 +157,10 @@
     display: flex; align-items: center; gap: 11px;
     padding: 9px 10px; border-radius: 9px;
     font-size: 13.5px; font-weight: 600; color: var(--ink-2);
-    cursor: pointer; transition: all .14s ease;
+    cursor: pointer; transition: background .14s ease, color .14s ease;
+    white-space: nowrap; overflow: hidden;
   }
-  .nav-item svg { width: 17px; height: 17px; color: var(--muted); transition: color .14s ease; }
+  .nav-item svg { width: 17px; height: 17px; flex-shrink: 0; color: var(--muted); transition: color .14s ease; }
   .nav-item:hover { background: var(--hover); }
   .nav-item.on { background: var(--violet-100); color: var(--violet); }
   .nav-item.on svg { color: var(--violet); }
@@ -184,6 +197,7 @@
 
   /* ============ App frame ============ */
   .app {
+    grid-column: 2; /* rail é absolute (col 1); fixa o conteúdo na coluna 1fr */
     height: 100%;
     min-height: 0;
     min-width: 0; /* impede que a ribbon larga estique as telas abaixo */
