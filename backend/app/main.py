@@ -5,6 +5,7 @@ from typing import Optional
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app import data_source
 from app import modules as module_registry
@@ -128,6 +129,49 @@ def get_cases(
     if log.empty or log[CASE_ID].nunique() == 0:
         return {"cases": []}
     return {"cases": build_cases(log)}
+
+
+class AskBody(BaseModel):
+    question: str
+
+
+@app.get("/api/ai/status")
+def ai_status():
+    from app.ai.agent import is_configured
+    return {"configured": is_configured()}
+
+
+@app.post("/api/modules/{key}/ask")
+def ask_module(
+    key: str,
+    body: AskBody,
+    fornecedores: list[str] = Query(default=[]),
+    start_date: Optional[str] = Query(default=None),
+    end_date:   Optional[str] = Query(default=None),
+    ano: Optional[int] = Query(default=None),
+    mes: Optional[int] = Query(default=None),
+):
+    from app.ai.agent import ask, is_configured
+    module = module_registry.get(key)
+    if not module:
+        raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
+    if not is_configured():
+        raise HTTPException(status_code=503,
+                            detail="Assistente de IA não configurado. Defina ANTHROPIC_API_KEY no backend.")
+    if not body.question.strip():
+        raise HTTPException(status_code=400, detail="Pergunta vazia")
+
+    log = data_source.get_log(module_key=key)
+    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
+    if log.empty:
+        raise HTTPException(status_code=422, detail="Nenhum caso para os filtros aplicados")
+
+    dim_label = "Fornecedor" if "fornecedor" in log.columns else (
+        "Cliente" if "cliente" in log.columns else "Dimensão")
+    try:
+        return ask(body.question, log, module.name, dim_label)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Falha ao consultar a IA: {exc}")
 
 
 @app.post("/api/upload")

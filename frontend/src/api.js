@@ -28,6 +28,24 @@ export function fetchCases(key, filters = {}) {
   return getJson(`/api/modules/${key}/cases${qs ? "?" + qs : ""}`);
 }
 
+export function aiStatus() {
+  return getJson("/api/ai/status");
+}
+
+export async function askAssistant(key, question, filters = {}) {
+  const qs = filterParams(filters);
+  const res = await fetch(`${BASE}/api/modules/${key}/ask${qs ? "?" + qs : ""}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.detail || `Erro ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function uploadCsv(file) {
   const form = new FormData();
   form.append("file", file);
