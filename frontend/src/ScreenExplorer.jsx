@@ -190,7 +190,7 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
         const vEdge = nextId ? edgeById[`${id}->${nextId}`] : null;
         return (
           <div key={id} style={{ display: "contents" }}>
-            <div className="node" ref={(el) => { nodeRefs.current[id] = el; }}
+            <div className="node" data-nid={id} ref={(el) => { nodeRefs.current[id] = el; }}
               onClick={(e) => onNodeClick?.(id, e.currentTarget.getBoundingClientRect())}>
               <div className="node-accent" style={{ background: freqColor(ratio) }} />
               <div className="node-body">
@@ -256,8 +256,9 @@ function NodePopover({ node, rect, total, active, onApply, onClose }) {
   const pctOf = (n) => (total ? Math.round(100 * (n || 0) / total) : 0);
   const opt = (mode, label, count, p) => {
     const on = active && active.id === node.id && active.mode === mode;
+    const disabled = !count;
     return (
-      <button className={"np-opt" + (on ? " on" : "")} onClick={() => onApply(mode)}>
+      <button className={"np-opt" + (on ? " on" : "")} disabled={disabled} onClick={() => onApply(mode)}>
         <span className="np-opt-l">{label}</span>
         <span className="np-opt-r mono">{fmtK(count)} <span className="np-opt-pct">({Math.round(p)}%)</span></span>
       </button>
@@ -335,8 +336,9 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
   const [popover, setPopover] = useState(null);
 
   function onPointerDown(e) {
-    // não inicia pan ao clicar nos controles (zoom/legenda/toolbar) nem no popover
-    if (e.target.closest("button, .zoom, .legend, .canvas-toolbar, .node-pop")) return;
+    // não inicia pan ao clicar nos controles, no popover ou numa caixa de etapa
+    // (numa caixa, deixamos o onClick do nó abrir o popover — sem capturar o ponteiro)
+    if (e.target.closest("button, .zoom, .legend, .canvas-toolbar, .node-pop, .node")) return;
     setPopover(null);
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: pan.x, oy: pan.y };
     setDragging(true);
