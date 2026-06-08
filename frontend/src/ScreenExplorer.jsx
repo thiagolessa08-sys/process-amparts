@@ -19,7 +19,7 @@ const IDEAL_BY_MODULE = {
 };
 
 /* ───────── subgrafo da união das variantes selecionadas ───────── */
-function buildSubgraph(data, selectedIds) {
+export function buildSubgraph(data, selectedIds) {
   const sel = data.variants.filter((v) => selectedIds.has(v.id));
   const totalCases = sel.reduce((s, v) => s + v.cases, 0);
   const nodeCases = {}, edgeCases = {};
@@ -42,7 +42,7 @@ function buildSubgraph(data, selectedIds) {
   return { ...data, nodes, edges, totalCases };
 }
 
-function defaultSelection(variants) {
+export function defaultSelection(variants) {
   const ids = new Set(); let cum = 0;
   for (const v of variants) { ids.add(v.id); cum += v.pct; if (cum >= 80) break; }
   if (ids.size === 0 && variants[0]) ids.add(variants[0].id);
@@ -65,7 +65,7 @@ function Donut({ pct }) {
 }
 
 /* ───────── Graph (fluxo vertical) ───────── */
-function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey, playingVariant, replayKey }) {
+export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey, playingVariant, replayKey }) {
   const graphRef = useRef(null);
   const nodeRefs = useRef({});
   const startRef = useRef(null);

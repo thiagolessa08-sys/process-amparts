@@ -4,12 +4,14 @@ import { ExplorerScreen, DrillDrawer } from "./ScreenExplorer.jsx";
 import { VariantsScreen } from "./ScreenVariants.jsx";
 import { DashboardScreen } from "./ScreenDashboard.jsx";
 import { OverviewScreen } from "./ScreenOverview.jsx";
+import { ReworkScreen } from "./ScreenRework.jsx";
 import { fetchModule, uploadCsv } from "./api.js";
 
 const SCREENS = [
   { id: "explorer", label: "Explorador", icon: "explorer" },
   { id: "variants", label: "Variantes",  icon: "variants" },
   { id: "dashboard", label: "Dashboard", icon: "activity" },
+  { id: "rework", label: "Retrabalho", icon: "loop" },
   { id: "overview", label: "Visão Geral", icon: "dashboard" },
 ];
 const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "" };
@@ -162,6 +164,7 @@ export default function App() {
     explorer:  { title: "Explorador de Processo", sub: <>Modelo descoberto · <b>{data.totalCases.toLocaleString("pt-BR")}</b> casos · <b>{data.avgVariants}</b> variantes</> },
     variants:  { title: "Variantes do Processo",  sub: <><b>{data.avgVariants}</b> caminhos distintos do início ao fim</> },
     dashboard: { title: "Dashboard de KPIs & Alertas", sub: <>Visão financeira — <b>{data.name}</b></> },
+    rework:    { title: "Análise de Retrabalho", sub: <><b>{data.rework?.pctComRetrabalho ?? 0}%</b> dos casos com retrabalho</> },
   }[screen];
 
   return (
@@ -238,6 +241,7 @@ export default function App() {
           {!loading && !error && data && (
             <>
               {screen === "overview" && <div className="screen-fill" style={{ overflowY: "auto" }}><OverviewScreen key={moduleKey} data={data} /></div>}
+              {screen === "rework" && <div className="screen-fill"><ReworkScreen key={moduleKey} data={data} /></div>}
               {screen === "explorer" && <ExplorerScreen key={moduleKey} data={data} filters={filters} onFiltersChange={onFiltersChange} />}
               {screen === "variants" && <div className="screen-fill"><VariantsScreen key={moduleKey} data={data} /></div>}
               {screen === "dashboard" && <div className="screen-fill" style={{ overflowY: "auto" }}><DashboardScreen key={moduleKey} data={data} onDrill={openDrill} /></div>}

@@ -10,6 +10,7 @@ from app.mining.variants import discover_variants
 from app.mining.conformance import is_conformant
 from app.modules.headline import headline_kpis, period_filters
 from app.modules.overview import overview
+from app.modules.rework import rework
 from app.eventlog import CASE_ID, TIMESTAMP
 
 # ── IDs canônicos ──────────────────────────────────────────────────────────────
@@ -202,6 +203,7 @@ class P2PModule(ProcessModule):
             "variants": variants, "kpis": kpis,
             "headlineKpis": headline_kpis(log, total_cases),
             "overview": overview(log, "fornecedor"),
+            "rework": rework(log, "fornecedor", {n["id"]: n["label"] for n in nodes}),
             "drill": drill,
             "filters": {
                 "variantLabel": "Variante",
