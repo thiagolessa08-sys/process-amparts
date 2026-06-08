@@ -18,7 +18,9 @@ const SCREENS = [
   { id: "cases", label: "Case Explorer", icon: "search" },
   { id: "assistant", label: "Assistente IA", icon: "bolt" },
 ];
-const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "" };
+const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", activity: null };
+
+const ACT_MODE_LABEL = { with: "Com", without: "Sem", start: "Inicia em", end: "Termina em" };
 
 /* mini-gráfico do KPI */
 function Spark({ data }) {
@@ -76,6 +78,14 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
           </select>
           <span className="caret"><Icon name="chevronD" size={14} /></span>
         </div>
+
+        {filters.activity && (
+          <button className="act-chip" onClick={() => setFilter({ activity: null })} title="Remover filtro de atividade">
+            <Icon name="filter" size={13} />
+            {ACT_MODE_LABEL[filters.activity.mode]}: <b>{filters.activity.label}</b>
+            <Icon name="close" size={13} />
+          </button>
+        )}
       </div>
 
       <div className="ribbon-spacer" />

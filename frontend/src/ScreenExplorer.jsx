@@ -65,7 +65,7 @@ function Donut({ pct }) {
 }
 
 /* ───────── Graph (fluxo vertical) ───────── */
-export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey, playingVariant, replayKey }) {
+export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey, playingVariant, replayKey, onNodeClick }) {
   const graphRef = useRef(null);
   const nodeRefs = useRef({});
   const startRef = useRef(null);
@@ -190,7 +190,8 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
         const vEdge = nextId ? edgeById[`${id}->${nextId}`] : null;
         return (
           <div key={id} style={{ display: "contents" }}>
-            <div className="node" ref={(el) => { nodeRefs.current[id] = el; }}>
+            <div className="node" ref={(el) => { nodeRefs.current[id] = el; }}
+              onClick={(e) => onNodeClick?.(id, e.currentTarget.getBoundingClientRect())}>
               <div className="node-accent" style={{ background: freqColor(ratio) }} />
               <div className="node-body">
                 <div className="node-title">{node.label}</div>
@@ -212,6 +213,82 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
 
       <div className="edge tiny"><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
       <div className="terminal end" ref={endRef}><span className="tdot" />FIM</div>
+    </div>
+  );
+}
+
+/* ───────── Popover de etapa (clique no nó) ───────── */
+const fmtK = (n) => {
+  n = Number(n) || 0;
+  return n >= 1000 ? (n / 1000).toFixed(1).replace(".", ",") + "K" : String(n);
+};
+
+function MiniRing({ pct, size = 46 }) {
+  const sw = 7, r = (size - sw) / 2, c = 2 * Math.PI * r, off = c * (1 - (pct || 0) / 100);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line-2)" strokeWidth={sw} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--violet)" strokeWidth={sw}
+        strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+    </svg>
+  );
+}
+
+function NodePopover({ node, rect, total, active, onApply, onClose }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => { window.removeEventListener("keydown", onKey); document.removeEventListener("mousedown", onDown); };
+  }, [onClose]);
+
+  const W = 304, H = 372, M = 12;
+  let left = rect.right + M;
+  if (left + W > window.innerWidth - 8) left = rect.left - W - M;
+  if (left < 8) left = 8;
+  let top = Math.max(8, rect.top);
+  if (top + H > window.innerHeight - 8) top = Math.max(8, window.innerHeight - H - 8);
+
+  const pct = node.pct ?? 0;
+  const pctOf = (n) => (total ? Math.round(100 * (n || 0) / total) : 0);
+  const opt = (mode, label, count, p) => {
+    const on = active && active.id === node.id && active.mode === mode;
+    return (
+      <button className={"np-opt" + (on ? " on" : "")} onClick={() => onApply(mode)}>
+        <span className="np-opt-l">{label}</span>
+        <span className="np-opt-r mono">{fmtK(count)} <span className="np-opt-pct">({Math.round(p)}%)</span></span>
+      </button>
+    );
+  };
+
+  return (
+    <div className="node-pop" ref={ref} style={{ left, top }} onMouseDown={(e) => e.stopPropagation()}>
+      <div className="np-head">
+        <span className="np-ic"><Icon name="variants" size={15} /></span>
+        <span className="np-title">{node.label}</span>
+        <button className="np-x" onClick={onClose}><Icon name="close" size={16} /></button>
+      </div>
+      <div className="np-cov">
+        <MiniRing pct={pct} />
+        <div>
+          <div className="np-cov-pct">{Math.round(pct)}% dos casos</div>
+          <div className="np-cov-sub mono"># {fmt(node.casesWith)} de {fmt(total)}</div>
+        </div>
+      </div>
+      <div className="np-freq">
+        <div className="np-freq-n mono">{fmtK(node.freq)} vezes</div>
+        <div className="np-freq-l">Frequência da atividade</div>
+      </div>
+      <div className="np-sel">Aplicar filtro</div>
+      <div className="np-opts">
+        {opt("with", "Com esta atividade", node.casesWith, pctOf(node.casesWith))}
+        {opt("without", "Sem esta atividade", node.casesWithout, pctOf(node.casesWithout))}
+        {opt("start", "Iniciando aqui", node.startCount, pctOf(node.startCount))}
+        {opt("end", "Terminando aqui", node.endCount, pctOf(node.endCount))}
+      </div>
     </div>
   );
 }
@@ -255,10 +332,12 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [popover, setPopover] = useState(null);
 
   function onPointerDown(e) {
-    // não inicia pan ao clicar nos controles (zoom/legenda/toolbar)
-    if (e.target.closest("button, .zoom, .legend, .canvas-toolbar")) return;
+    // não inicia pan ao clicar nos controles (zoom/legenda/toolbar) nem no popover
+    if (e.target.closest("button, .zoom, .legend, .canvas-toolbar, .node-pop")) return;
+    setPopover(null);
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: pan.x, oy: pan.y };
     setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -268,13 +347,26 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
     setPan({ x: dragRef.current.ox + (e.clientX - dragRef.current.sx), y: dragRef.current.oy + (e.clientY - dragRef.current.sy) });
   }
   function onPointerUp() { dragRef.current = null; setDragging(false); }
-  function resetView() { setPan({ x: 0, y: 0 }); setZoom(0.92); }
+  function resetView() { setPan({ x: 0, y: 0 }); setZoom(0.92); setPopover(null); }
 
   const [localForn, setLocalForn] = useState(filters?.fornecedores ?? []);
   const [startDate, setStartDate] = useState(filters?.startDate ?? "");
   const [endDate, setEndDate]     = useState(filters?.endDate ?? "");
 
-  useEffect(() => { setSelectedIds(defaultSelection(data.variants)); setPlayingId(null); }, [data]);
+  useEffect(() => { setSelectedIds(defaultSelection(data.variants)); setPlayingId(null); setPopover(null); }, [data]);
+
+  const nodeMeta = useMemo(() => Object.fromEntries(data.nodes.map((n) => [n.id, n])), [data]);
+  function onNodeClick(id, rect) {
+    const n = nodeMeta[id];
+    if (!n || n.type) return; // terminais Início/Fim não abrem
+    setPopover({ node: n, rect });
+  }
+  function applyActivity(mode) {
+    const cur = filters?.activity;
+    const same = cur && cur.id === popover.node.id && cur.mode === mode;
+    onFiltersChange({ ...filters, activity: same ? null : { id: popover.node.id, mode, label: popover.node.label } });
+    setPopover(null);
+  }
 
   // a variante reproduzida entra no grafo mesmo que não esteja selecionada
   const effectiveIds = useMemo(() => {
@@ -404,7 +496,7 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
           onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
           <Graph graphData={graphData} mode={mode} zoom={zoom} pan={pan} dragging={dragging}
             animKey={[...selectedIds].sort().join(",")} moduleKey={data.key}
-            playingVariant={playingVariant} replayKey={replayKey} />
+            playingVariant={playingVariant} replayKey={replayKey} onNodeClick={onNodeClick} />
         </div>
 
         <div className="legend">
@@ -416,13 +508,18 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
 
         <div className="zoom">
           <div className="zoom-stack">
-            <button onClick={() => setZoom((z) => Math.min(1.8, +(z + 0.12).toFixed(2)))}><Icon name="plus" size={16} /></button>
-            <button onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.12).toFixed(2)))}><Icon name="minus" size={16} /></button>
+            <button onClick={() => { setZoom((z) => Math.min(1.8, +(z + 0.12).toFixed(2))); setPopover(null); }}><Icon name="plus" size={16} /></button>
+            <button onClick={() => { setZoom((z) => Math.max(0.4, +(z - 0.12).toFixed(2))); setPopover(null); }}><Icon name="minus" size={16} /></button>
             <button onClick={resetView}><Icon name="fit" size={16} /></button>
           </div>
           <div className="zoom-pct mono">{Math.round(zoom * 100)}%</div>
         </div>
       </div>
+
+      {popover && (
+        <NodePopover node={popover.node} rect={popover.rect} total={data.totalCases}
+          active={filters?.activity} onApply={applyActivity} onClose={() => setPopover(null)} />
+      )}
     </div>
   );
 }

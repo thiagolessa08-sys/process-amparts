@@ -650,6 +650,52 @@
   .as-send:hover:not(:disabled) { transform: translateY(-1px); }
   .as-send:disabled { opacity: .45; cursor: default; }
 
+  /* ============ Popover de etapa (Explorador) ============ */
+  .node-pop {
+    position: fixed; z-index: 200; width: 304px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 16px; box-shadow: var(--shadow-pop);
+    padding: 16px; animation: npIn .14s ease;
+  }
+  @keyframes npIn { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: none; } }
+  .np-head { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }
+  .np-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; background: var(--violet-100); color: var(--violet); }
+  .np-title { font-size: 14.5px; font-weight: 700; color: var(--ink); flex: 1; letter-spacing: -0.01em; }
+  .np-x { width: 26px; height: 26px; display: grid; place-items: center; border: none; background: transparent; color: var(--muted); border-radius: 7px; cursor: pointer; }
+  .np-x:hover { background: var(--chip); color: var(--ink); }
+
+  .np-cov { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .np-cov-pct { font-size: 16px; font-weight: 700; color: var(--ink); }
+  .np-cov-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .np-freq { background: var(--inset); border: 1px solid var(--line); border-radius: 10px; padding: 9px 13px; margin-bottom: 14px; }
+  .np-freq-n { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .np-freq-l { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+
+  .np-sel { font-size: 12.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 8px; }
+  .np-opts { display: flex; flex-direction: column; gap: 7px; }
+  .np-opt {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 9px;
+    padding: 9px 12px; cursor: pointer; transition: all .12s ease; text-align: left;
+  }
+  .np-opt:hover { border-color: #cdd0e0; background: var(--hover); }
+  .np-opt-r { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+  .np-opt-pct { color: var(--muted); }
+  .np-opt.on { background: var(--violet); border-color: var(--violet); color: #fff; box-shadow: 0 3px 10px -2px rgba(90,47,224,.5); }
+  .np-opt.on .np-opt-r, .np-opt.on .np-opt-pct { color: rgba(255,255,255,.9); }
+
+  /* chip de filtro de atividade ativo (ribbon) */
+  .act-chip {
+    display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+    font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--violet);
+    background: var(--violet-100); border: 1px solid transparent; border-radius: 999px;
+    padding: 7px 11px; cursor: pointer; transition: background .12s; white-space: nowrap;
+  }
+  .act-chip:hover { background: rgba(90,47,224,.18); }
+  .act-chip b { font-weight: 700; }
+
   /* ============ Body split ============ */
   .body {
     display: grid;

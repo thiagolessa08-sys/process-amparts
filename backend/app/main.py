@@ -14,7 +14,7 @@ from app.connectors.csv_connector import CSVConnector
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.stats import compute_statistics
-from app.eventlog import CASE_ID, TIMESTAMP
+from app.eventlog import CASE_ID, ACTIVITY, TIMESTAMP
 
 app = FastAPI(title="Process Mining API")
 
@@ -73,6 +73,29 @@ def _apply_filters(
     return log
 
 
+def _apply_activity_filter(log: pd.DataFrame, module, act_id, act_mode) -> pd.DataFrame:
+    """Filtra os casos por uma atividade (with / without / start / end)."""
+    if not act_id or not act_mode:
+        return log
+    raws = set(module.raw_activities(act_id))
+    log[TIMESTAMP] = pd.to_datetime(log[TIMESTAMP])
+    ordered = log.sort_values([CASE_ID, TIMESTAMP])
+    if act_mode == "with":
+        cases = ordered[ordered[ACTIVITY].isin(raws)][CASE_ID].unique()
+    elif act_mode == "without":
+        has = set(ordered[ordered[ACTIVITY].isin(raws)][CASE_ID].unique())
+        cases = [c for c in ordered[CASE_ID].unique() if c not in has]
+    elif act_mode == "start":
+        firsts = ordered.groupby(CASE_ID, sort=False)[ACTIVITY].first()
+        cases = firsts[firsts.isin(raws)].index
+    elif act_mode == "end":
+        lasts = ordered.groupby(CASE_ID, sort=False)[ACTIVITY].last()
+        cases = lasts[lasts.isin(raws)].index
+    else:
+        return log
+    return log[log[CASE_ID].isin(cases)]
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -101,12 +124,15 @@ def get_module(
     end_date:   Optional[str] = Query(default=None),
     ano: Optional[int] = Query(default=None),
     mes: Optional[int] = Query(default=None),
+    act_id: Optional[str] = Query(default=None),
+    act_mode: Optional[str] = Query(default=None),
 ):
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
     log = data_source.get_log(module_key=key)
     log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
+    log = _apply_activity_filter(log, module, act_id, act_mode)
     if log.empty or log[CASE_ID].nunique() == 0:
         raise HTTPException(status_code=422, detail="Nenhum caso encontrado para os filtros aplicados")
     return module.enrich(log)
@@ -120,12 +146,15 @@ def get_cases(
     end_date:   Optional[str] = Query(default=None),
     ano: Optional[int] = Query(default=None),
     mes: Optional[int] = Query(default=None),
+    act_id: Optional[str] = Query(default=None),
+    act_mode: Optional[str] = Query(default=None),
 ):
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
     log = data_source.get_log(module_key=key)
     log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
+    log = _apply_activity_filter(log, module, act_id, act_mode)
     if log.empty or log[CASE_ID].nunique() == 0:
         return {"cases": []}
     return {"cases": build_cases(log)}

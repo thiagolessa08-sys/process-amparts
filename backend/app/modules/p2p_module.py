@@ -7,6 +7,7 @@ import pandas as pd
 from app.modules.base import ProcessModule
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
+from app.mining.activity_stats import activity_metrics
 from app.mining.conformance import is_conformant
 from app.modules.headline import headline_kpis, period_filters
 from app.modules.overview import overview
@@ -124,6 +125,7 @@ class P2PModule(ProcessModule):
     short = "P2P"
     color = "#4F46E5"
     ideal_path = IDEAL_ACTIVITIES
+    activity_map = ACTIVITY_MAP
 
     def enrich(self, log: pd.DataFrame) -> dict:
         log = log.copy()
@@ -134,6 +136,7 @@ class P2PModule(ProcessModule):
         node_metrics = {n["id"]: n for n in dfg["nodes"]}
         edge_metrics = {(e["source"], e["target"]): e for e in dfg["edges"]}
         raw_variants = discover_variants(log, ideal_path=IDEAL_ACTIVITIES)
+        act_stats    = activity_metrics(log)
 
         # ── nós ──
         nodes = []
@@ -145,6 +148,8 @@ class P2PModule(ProcessModule):
                 "cases": total_cases if "type" in skel else m.get("count", 0),
                 "avgDwell": _fmt_days(m.get("avg_dwell_seconds", 0)),
             }
+            if nid in act_stats:
+                node.update(act_stats[nid])
             if "type" in skel:
                 node["type"] = skel["type"]
             if skel.get("branch"):

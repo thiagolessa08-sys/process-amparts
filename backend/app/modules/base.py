@@ -30,6 +30,14 @@ class ProcessModule(ABC):
         """IDs das atividades do caminho feliz, na ordem correta."""
         ...
 
+    # mapa nome-cru -> id-canônico (sobrescrito pelos módulos)
+    activity_map: dict = {}
+
+    def raw_activities(self, canonical: str) -> list[str]:
+        """Nomes crus do event log que correspondem a um id canônico."""
+        raws = [raw for raw, canon in self.activity_map.items() if canon == canonical]
+        return raws or [canonical]
+
     @abstractmethod
     def enrich(self, log: pd.DataFrame) -> dict:
         """Recebe o event log e devolve o payload completo do módulo
