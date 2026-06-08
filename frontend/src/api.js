@@ -6,7 +6,7 @@ async function getJson(path) {
   return res.json();
 }
 
-export function fetchModule(key, filters = {}) {
+function filterParams(filters = {}) {
   const params = new URLSearchParams();
   if (filters.fornecedores?.length) {
     filters.fornecedores.forEach((f) => params.append("fornecedores", f));
@@ -15,8 +15,17 @@ export function fetchModule(key, filters = {}) {
   if (filters.endDate)   params.set("end_date",   filters.endDate);
   if (filters.ano)       params.set("ano", filters.ano);
   if (filters.mes)       params.set("mes", filters.mes);
-  const qs = params.toString();
+  return params.toString();
+}
+
+export function fetchModule(key, filters = {}) {
+  const qs = filterParams(filters);
   return getJson(`/api/modules/${key}${qs ? "?" + qs : ""}`);
+}
+
+export function fetchCases(key, filters = {}) {
+  const qs = filterParams(filters);
+  return getJson(`/api/modules/${key}/cases${qs ? "?" + qs : ""}`);
 }
 
 export async function uploadCsv(file) {
