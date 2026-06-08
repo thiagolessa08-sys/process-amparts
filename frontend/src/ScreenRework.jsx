@@ -15,31 +15,26 @@ const fmtPct = (n) => (Number(n) || 0).toLocaleString("pt-BR", { minimumFraction
 /* ───────── Pizza (com/sem retrabalho) ───────── */
 const PIE_COLORS = { "Com Retrabalho": "#e5484d", "Sem Retrabalho": "#16a34a" };
 
-function Pie({ data, size = 168 }) {
-  const r = size / 2, cx = r, cy = r;
+function Donut({ data, size = 172, thickness = 30 }) {
+  const r = (size - thickness) / 2, c = 2 * Math.PI * r, cx = size / 2;
   let acc = 0;
-  const pt = (frac) => {
-    const a = 2 * Math.PI * frac - Math.PI / 2;
-    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
-  };
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {data.map((d) => {
-        const start = acc, end = acc + d.pct / 100;
-        acc = end;
-        if (d.pct <= 0) return null;
-        if (d.pct >= 99.999) {
-          return <circle key={d.nome} cx={cx} cy={cy} r={r} fill={PIE_COLORS[d.nome] || "#999"} />;
-        }
-        const [x1, y1] = pt(start), [x2, y2] = pt(end);
-        const large = end - start > 0.5 ? 1 : 0;
-        return (
-          <path key={d.nome} d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`}
-            fill={PIE_COLORS[d.nome] || "#999"}>
-            <title>{d.nome}: {fmtPct(d.pct)}</title>
-          </path>
-        );
-      })}
+      <g transform={`rotate(-90 ${cx} ${cx})`}>
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--line-2)" strokeWidth={thickness} />
+        {data.map((d) => {
+          const len = c * (d.pct / 100);
+          const el = (
+            <circle key={d.nome} cx={cx} cy={cx} r={r} fill="none"
+              stroke={PIE_COLORS[d.nome] || "#999"} strokeWidth={thickness} strokeLinecap="butt"
+              strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-acc}>
+              <title>{d.nome}: {fmtPct(d.pct)}</title>
+            </circle>
+          );
+          acc += len;
+          return el;
+        })}
+      </g>
     </svg>
   );
 }
@@ -84,9 +79,9 @@ function ComSemPanel({ rows = [] }) {
         <span className="pt">Com ou Sem Retrabalho</span>
       </div>
       <div className="panel-body">
-        <div className="clients" style={{ justifyContent: "center" }}>
-          <Pie data={rows} />
-          <div className="clients-legend" style={{ gridTemplateColumns: "1fr" }}>
+        <div className="rwk-donut-wrap">
+          <Donut data={rows} />
+          <div className="rwk-legend">
             {rows.map((d) => (
               <div className="lchip" key={d.nome}>
                 <span className="sw" style={{ background: PIE_COLORS[d.nome] || "#999" }} />
@@ -111,7 +106,7 @@ function PorClientePanel({ rows = [], dim }) {
         <span className="ph-meta">{dim}</span>
       </div>
       <div className="panel-body">
-        <div className="nf-wrap">
+        <div className="nf-wrap rwk-nf">
           <table className="nf-table rwk-table">
             <thead>
               <tr><th>{dim}</th><th>Qtde Unidades</th><th>Itens Venda</th><th>% Retrabalho</th></tr>

@@ -467,18 +467,15 @@
   .rework {
     display: grid;
     grid-template-columns: minmax(330px, 0.9fr) 1.75fr;
-    align-items: start; /* não estica os filhos: deixa cada coluna ter altura natural */
     gap: 16px;
     padding: 18px 20px;
     height: 100%;
-    overflow-y: auto; /* rola quando a janela é baixa, em vez de cortar a parte de baixo */
+    min-height: 0;
     box-sizing: border-box;
   }
   .rwk-flow {
     position: relative;
     overflow: auto;
-    min-height: 560px;
-    max-height: calc(100vh - 200px);
     background: var(--canvas-bg);
     background-image: radial-gradient(circle, var(--dot) 1.1px, transparent 1.1px);
     background-size: 24px 24px;
@@ -487,8 +484,15 @@
     box-shadow: var(--shadow-card);
   }
   .rwk-graph-scroll { display: grid; place-items: start center; min-height: 100%; }
-  .rwk-col { display: grid; grid-template-rows: minmax(260px, auto) minmax(300px, auto); gap: 16px; }
-  .rwk-bottom { display: grid; grid-template-columns: 0.8fr 1.25fr; gap: 16px; min-height: 300px; }
+  .rwk-col { display: grid; grid-template-rows: auto auto; gap: 16px; align-content: start; min-height: 0; }
+  .rwk-bottom { display: grid; grid-template-columns: 0.8fr 1.25fr; gap: 16px; align-items: stretch; min-height: 0; }
+  /* tabela Retrabalho por Fornecedor: 7 linhas com rolagem própria */
+  .rwk-nf { max-height: 303px; }
+
+  /* Com ou Sem Retrabalho: rosca em cima, legenda embaixo */
+  .rwk-donut-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 4px 0; }
+  .rwk-legend { display: flex; flex-direction: column; gap: 9px; width: 100%; max-width: 240px; }
+  .rwk-legend .lchip { font-size: 12.5px; }
 
   /* célula de % com barra vermelha (Retrabalho por cliente) */
   .rwk-table tbody td:last-child { width: 132px; padding: 6px 10px; }
