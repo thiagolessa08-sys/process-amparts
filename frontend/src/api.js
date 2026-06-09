@@ -2,7 +2,12 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 async function getJson(path) {
   const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`Erro ${res.status} em ${path}`);
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    const err = new Error(detail.detail || `Erro ${res.status} em ${path}`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 

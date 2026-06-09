@@ -14,6 +14,8 @@ Atividades (ACTIVITY_EN / SORTING):
   CRIOU PEDIDO    20 · CANCELOU PEDIDO    21 · APROVOU PEDIDO    25   (inferido)
   CRIOU FATURA    30 · CANCELOU FATURA    31 · APROVOU FATURA    35   (inferido)
 """
+import gc
+
 import pandas as pd
 
 from ..connectors.agent_connector import AgentConnector
@@ -66,12 +68,12 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     if not conn.configured():
         raise RuntimeError("AGENT_URL/AGENT_API_KEY não configurados")
 
-    # itens (paginação keyset por intnum+linha)
+    # itens (paginação keyset por intnum+linha) — só colunas usadas, p/ poupar memória
     q = conn.paginate_keyset(
         "QuotationDocNumber, QuotationItemLine, QuotationDocInternalNumber, "
         "QuotationDocCreationDate, QuotationDocCreationTS, QuotationDocCancellationStatus, "
         "QuotationUserSignName, QuotationSalesEmployeeName, QuotationCustomerName, "
-        "QuotationItemCode, QuotationItemDescription, QuotationItemTotal",
+        "QuotationItemTotal",
         f"{SCHEMA}.COTACOES_SAP_PRODUCAO",
         "QuotationDocInternalNumber", "QuotationItemLine")
     o = conn.paginate_keyset(
@@ -79,7 +81,7 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
         "OrderItemBaseDocIntNumber, OrderItemBaseLine, "
         "OrderDocCreationDate, OrderDocCreationTS, OrderDocCancellationStatus, "
         "OrderUserSignName, OrderSalesEmployeeName, OrderCustomerName, "
-        "OrderItemCode, OrderItemDescription, OrderItemItemTotal",
+        "OrderItemItemTotal",
         f"{SCHEMA}.PEDIDOS_SAP_PRODUCAO",
         "OrderDocInternalNumber", "OrderItemLine")
     inv = conn.paginate_keyset(
@@ -87,7 +89,7 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
         "InvoiceItemSourceDocIntNumber, InvoiceItemSourceLine, "
         "InvoiceDocCreationDate, InvoiceDocCreationTS, InvoiceDocCancellationStatus, "
         "InvoiceUserSignName, InvoiceSalesEmployeeName, InvoiceCustomerName, "
-        "InvoiceItemCode, InvoiceItemDescription, InvoiceItemItemTotal",
+        "InvoiceItemItemTotal",
         f"{SCHEMA}.NFSAIDA_SAP_PRODUCAO",
         "InvoiceDocInternalNumber", "InvoiceItemLine")
     apr = conn.paginate_df(
@@ -104,78 +106,82 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     inv["i_int"], inv["i_line"] = _num(inv["InvoiceDocInternalNumber"]), _num(inv["InvoiceItemLine"])
     inv["i_sint"], inv["i_sline"] = _num(inv["InvoiceItemSourceDocIntNumber"]), _num(inv["InvoiceItemSourceLine"])
 
-    # ── perspectivas (cada doc resolve a cadeia ORC→PED→FAT) ──
-    qoi = (q.merge(o, left_on=["q_int", "q_line"], right_on=["o_bint", "o_bline"], how="left")
-             .merge(inv, left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left"))
-    oqi = (o.merge(q, left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left")
-             .merge(inv, left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left"))
-    ioq = (inv.merge(o, left_on=["i_sint", "i_sline"], right_on=["o_int", "o_line"], how="left")
-              .merge(q, left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left"))
+    # projeções slim — só o necessário para encadear/montar a case key
+    q_slim = q[["QuotationDocNumber", "QuotationItemLine", "q_int", "q_line"]]
+    o_slim = o[["OrderDocNumber", "OrderItemLine", "o_int", "o_line", "o_bint", "o_bline"]]
+    i_slim = inv[["InvoiceDocNumber", "InvoiceItemLine", "i_sint", "i_sline"]]
 
     KP = ("QuotationDocNumber", "QuotationItemLine", "OrderDocNumber", "OrderItemLine",
           "InvoiceDocNumber", "InvoiceItemLine")
+
+    # aprovações por tipo (status Y), pré-fatiadas
+    apr["dt_n"] = _num(apr["dtype"])
+    apr["st_u"] = apr["st"].astype(str).str.upper()
+    apr["appr_ts"] = _combine(apr["adate"], apr["atime"])
+    apr_ok = apr[apr["st_u"] == "Y"]
+
     parts = []
 
-    # ORÇAMENTO
-    qoi_ts = _combine(qoi["QuotationDocCreationDate"], qoi["QuotationDocCreationTS"])
-    parts.append(_rows(qoi, "CRIOU ORCAMENTO", 10, qoi_ts,
-                       "QuotationUserSignName", "QuotationSalesEmployeeName",
-                       "QuotationCustomerName", "QuotationItemTotal", *KP))
+    def _aprov(persp, dtype, intcol, activity, sort):
+        ok = apr_ok[apr_ok["dt_n"] == dtype][["k", "appr_ts", "step"]].copy()
+        if ok.empty:
+            return
+        ok["k"] = _num(ok["k"])
+        m = persp.merge(ok, left_on=intcol, right_on="k", how="inner")
+        if not m.empty:
+            parts.append(_rows(m, activity, sort, m["appr_ts"], "step",
+                               "salesemp", "customer", "valor", *KP))
+
+    # ── ORÇAMENTO ──
+    qoi = (q.merge(o_slim, left_on=["q_int", "q_line"], right_on=["o_bint", "o_bline"], how="left")
+             .merge(i_slim, left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left")
+             .rename(columns={"QuotationSalesEmployeeName": "salesemp",
+                              "QuotationCustomerName": "customer", "QuotationItemTotal": "valor"}))
+    ts = _combine(qoi["QuotationDocCreationDate"], qoi["QuotationDocCreationTS"])
+    parts.append(_rows(qoi, "CRIOU ORCAMENTO", 10, ts,
+                       "QuotationUserSignName", "salesemp", "customer", "valor", *KP))
     canc = qoi[qoi["QuotationDocCancellationStatus"].astype(str).str.upper() == "Y"]
     if not canc.empty:
         parts.append(_rows(canc, "CANCELOU ORCAMENTO", 11,
                            _combine(canc["QuotationDocCreationDate"], canc["QuotationDocCreationTS"]),
-                           "QuotationUserSignName", "QuotationSalesEmployeeName",
-                           "QuotationCustomerName", "QuotationItemTotal", *KP))
+                           "QuotationUserSignName", "salesemp", "customer", "valor", *KP))
+    _aprov(qoi, 23, "q_int", "APROVOU ORCAMENTO", 15)
+    del qoi, canc
+    gc.collect()
 
-    # PEDIDO
-    oqi_ts = _combine(oqi["OrderDocCreationDate"], oqi["OrderDocCreationTS"])
-    parts.append(_rows(oqi, "CRIOU PEDIDO", 20, oqi_ts,
-                       "OrderUserSignName", "OrderSalesEmployeeName",
-                       "OrderCustomerName", "OrderItemItemTotal", *KP))
+    # ── PEDIDO ──
+    oqi = (o.merge(q_slim, left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left")
+             .merge(i_slim, left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left")
+             .rename(columns={"OrderSalesEmployeeName": "salesemp",
+                              "OrderCustomerName": "customer", "OrderItemItemTotal": "valor"}))
+    ts = _combine(oqi["OrderDocCreationDate"], oqi["OrderDocCreationTS"])
+    parts.append(_rows(oqi, "CRIOU PEDIDO", 20, ts,
+                       "OrderUserSignName", "salesemp", "customer", "valor", *KP))
     cancp = oqi[oqi["OrderDocCancellationStatus"].astype(str).str.upper() == "Y"]
     if not cancp.empty:
         parts.append(_rows(cancp, "CANCELOU PEDIDO", 21,
                            _combine(cancp["OrderDocCreationDate"], cancp["OrderDocCreationTS"]),
-                           "OrderUserSignName", "OrderSalesEmployeeName",
-                           "OrderCustomerName", "OrderItemItemTotal", *KP))
+                           "OrderUserSignName", "salesemp", "customer", "valor", *KP))
+    _aprov(oqi, 17, "o_int", "APROVOU PEDIDO", 25)
+    del oqi, cancp
+    gc.collect()
 
-    # FATURA
-    ioq_ts = _combine(ioq["InvoiceDocCreationDate"], ioq["InvoiceDocCreationTS"])
-    parts.append(_rows(ioq, "CRIOU FATURA", 30, ioq_ts,
-                       "InvoiceUserSignName", "InvoiceSalesEmployeeName",
-                       "InvoiceCustomerName", "InvoiceItemItemTotal", *KP))
+    # ── FATURA ──
+    ioq = (inv.merge(o_slim, left_on=["i_sint", "i_sline"], right_on=["o_int", "o_line"], how="left")
+              .merge(q_slim, left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left")
+              .rename(columns={"InvoiceSalesEmployeeName": "salesemp",
+                               "InvoiceCustomerName": "customer", "InvoiceItemItemTotal": "valor"}))
+    ts = _combine(ioq["InvoiceDocCreationDate"], ioq["InvoiceDocCreationTS"])
+    parts.append(_rows(ioq, "CRIOU FATURA", 30, ts,
+                       "InvoiceUserSignName", "salesemp", "customer", "valor", *KP))
     cancf = ioq[ioq["InvoiceDocCancellationStatus"].astype(str).str.upper().isin(["Y", "C"])]
     if not cancf.empty:
         parts.append(_rows(cancf, "CANCELOU FATURA", 31,
                            _combine(cancf["InvoiceDocCreationDate"], cancf["InvoiceDocCreationTS"]),
-                           "InvoiceUserSignName", "InvoiceSalesEmployeeName",
-                           "InvoiceCustomerName", "InvoiceItemItemTotal", *KP))
-
-    # ── APROVAÇÕES (anexam ao doc aprovado pelo tipo) ──
-    apr["dt_n"] = _num(apr["dtype"])
-    apr["st_u"] = apr["st"].astype(str).str.upper()
-    apr["appr_ts"] = _combine(apr["adate"], apr["atime"])
-
-    def _aprov(persp, dtype, intcol, activity, sort):
-        ok = apr[(apr["dt_n"] == dtype) & (apr["st_u"] == "Y")][["k", "appr_ts", "step"]].copy()
-        if ok.empty:
-            return None
-        ok["k"] = _num(ok["k"])
-        m = persp.merge(ok, left_on=intcol, right_on="k", how="inner")
-        if m.empty:
-            return None
-        out = _rows(m, activity, sort, m["appr_ts"], "step",
-                    "QuotationSalesEmployeeName", "QuotationCustomerName",
-                    "QuotationItemTotal", *KP)
-        return out
-
-    a_orc = _aprov(qoi, 23, "q_int", "APROVOU ORCAMENTO", 15)
-    a_ped = _aprov(oqi, 17, "o_int", "APROVOU PEDIDO", 25)
-    a_fat = _aprov(ioq, 13, "i_int", "APROVOU FATURA", 35)
-    for a in (a_orc, a_ped, a_fat):
-        if a is not None:
-            parts.append(a)
+                           "InvoiceUserSignName", "salesemp", "customer", "valor", *KP))
+    _aprov(ioq, 13, "i_int", "APROVOU FATURA", 35)
+    del ioq, cancf
+    gc.collect()
 
     log = pd.concat(parts, ignore_index=True)
     log["eventtime"] = pd.to_datetime(log["eventtime"], errors="coerce")

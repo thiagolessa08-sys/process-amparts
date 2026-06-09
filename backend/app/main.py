@@ -43,15 +43,7 @@ def _prewarm():
     usuário não esperar no primeiro clique. Silencioso se o agent estiver fora."""
     if os.environ.get("CORDEIRO_PREWARM", "1") != "1":
         return
-    import threading
-
-    def _warm():
-        try:
-            data_source.get_log("cordeiro")
-        except Exception as exc:  # agent indisponível / URL trocada
-            print(f"[prewarm] cordeiro não aquecido: {exc}")
-
-    threading.Thread(target=_warm, daemon=True).start()
+    data_source.start_cordeiro_load()
 
 
 def _apply_filters(
@@ -153,6 +145,16 @@ def get_module(
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
+    # Cordeiro: carga real é assíncrona; nunca bloqueia/recarrega dentro do request
+    if key == "cordeiro" and data_source._state["path"] is None:
+        st = data_source.cordeiro_status()
+        if st != "ready":
+            data_source.start_cordeiro_load()
+            if st == "error":
+                raise HTTPException(status_code=503,
+                                    detail=f"Falha ao carregar Cordeiro do banco: {data_source.cordeiro_error()}")
+            raise HTTPException(status_code=503,
+                                detail="Carregando dados do Cordeiro do banco… aguarde ~1–2 min e recarregue.")
     ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, act_id, act_mode)
     cached = _ENRICH_CACHE.get(ck)
     if cached is not None:
