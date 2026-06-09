@@ -131,6 +131,23 @@ def statistics():
     return compute_statistics(data_source.get_log())
 
 
+@app.get("/api/debug/config")
+def debug_config():
+    """Diagnóstico seguro: mostra o que o backend enxerga, sem vazar a chave."""
+    url = os.environ.get("AGENT_URL", "")
+    key = os.environ.get("AGENT_API_KEY", "")
+    return {
+        "agent_url_set": bool(url),
+        "agent_url_host": url.split("//")[-1].split("/")[0] if url else None,
+        "agent_api_key_set": bool(key),
+        "agent_api_key_len": len(key),
+        "anthropic_key_set": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "cordeiro_prewarm": os.environ.get("CORDEIRO_PREWARM", "1"),
+        "cordeiro_status": data_source.cordeiro_status(),
+        "cordeiro_error": data_source.cordeiro_error(),
+    }
+
+
 @app.get("/api/modules/{key}")
 def get_module(
     key: str,
