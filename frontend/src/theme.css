@@ -717,7 +717,7 @@
   .act-chip b { font-weight: 700; }
 
   /* ============ 2 Way Match ============ */
-  .tm-svg { width: 100%; height: 200px; display: block; flex: 1; min-height: 0; }
+  .tm-svg { width: 100%; height: auto; display: block; }
   .tm-grid { stroke: var(--line-2); stroke-width: 1; }
   .tm-axis { font-size: 9px; fill: var(--faint); font-family: "JetBrains Mono", monospace; }
   .tm-pctlbl { font-size: 10px; font-weight: 700; fill: #2f5fe0; font-family: "JetBrains Mono", monospace; }
@@ -741,7 +741,7 @@
   .up-kpi-unit { font-size: 15px; font-weight: 700; color: var(--muted); }
   .up-kpi-desc { font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
 
-  .up-area-svg { width: 100%; height: 280px; display: block; }
+  .up-area-svg { width: 100%; height: auto; display: block; }
   .up-empty { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
 
   .up-seg.seg { box-shadow: none; }

@@ -36,7 +36,7 @@ function AreaChart({ series }) {
   let lastY = null;
   series.forEach((s, i) => { const y = s.date.slice(0, 4); if (y !== lastY) { years.push({ i, y }); lastY = y; } });
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg">
       <defs>
         <linearGradient id="upArea" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#5b8def" stopOpacity="0.45" />
@@ -114,30 +114,30 @@ function MonthlyArea({ data }) {
   const area = `M ${padL},${padT + ch} L ${line} L ${padL + cw},${padT + ch} Z`;
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(t * max));
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg" style={{ height: 300 }} preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg">
       {ticks.map((t, i) => { const y = ys(t); return <g key={i}><line x1={padL} x2={W - padR} y1={y} y2={y} className="tm-grid" /><text x={padL - 6} y={y + 3} className="tm-axis" textAnchor="end">{t}</text></g>; })}
       <path d={area} fill="#e6607c" fillOpacity="0.82" />
       {data.map((d, i) => <circle key={i} cx={xs(i)} cy={ys(d.events)} r="3.5" fill="#f3c14b" stroke="#fff" strokeWidth="1" />)}
-      {data.map((d, i) => (i % 2 === 0 || data.length <= 12) && <text key={"t" + i} x={xs(i)} y={H - 8} className="tm-axis" textAnchor="end" transform={`rotate(-40 ${xs(i)} ${H - 8})`}>{d.mes}</text>)}
+      {data.map((d, i) => (i % 3 === 0 || i === data.length - 1) && <text key={"t" + i} x={xs(i)} y={H - 12} className="tm-axis" textAnchor="middle">{d.mes}</text>)}
     </svg>
   );
 }
 
 /* ───────── perfil diário (barras por faixa de hora) ───────── */
 function DailyProfile({ data }) {
-  const W = 1180, H = 300, padL = 44, padR = 14, padT = 16, padB = 56;
+  const W = 1180, H = 280, padL = 44, padR = 14, padT = 16, padB = 32;
   const cw = W - padL - padR, ch = H - padT - padB;
   const max = Math.max(1, ...data.map((d) => d.count));
   const n = data.length, group = cw / n, bw = Math.min(54, group * 0.6);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(t * max));
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg" style={{ height: 280 }} preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg">
       {ticks.map((t, i) => { const y = padT + ch - (t / max) * ch; return <g key={i}><line x1={padL} x2={W - padR} y1={y} y2={y} className="tm-grid" /><text x={padL - 6} y={y + 3} className="tm-axis" textAnchor="end">{t}</text></g>; })}
       {data.map((d, i) => {
         const gx = padL + i * group + group / 2, h = (d.count / max) * ch;
         return <g key={i}>
           <rect x={gx - bw / 2} y={padT + ch - h} width={bw} height={Math.max(0, h)} rx="2" fill="#e6607c" />
-          <text x={gx} y={H - 8} className="tm-axis" textAnchor="end" transform={`rotate(-40 ${gx} ${H - 8})`}>{d.bucket}</text>
+          <text x={gx} y={H - 10} className="tm-axis" textAnchor="middle">{d.bucket.replace(/:00/g, "").replace(" - ", "–") + "h"}</text>
         </g>;
       })}
     </svg>

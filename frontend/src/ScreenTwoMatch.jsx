@@ -27,7 +27,7 @@ function GroupedBars({ data }) {
   const n = Math.max(1, data.length), group = cw / n, bw = Math.min(15, group / 3);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => t * max);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="tm-svg" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${W} ${H}`} className="tm-svg">
       {ticks.map((t, i) => {
         const y = padT + ch - (t / max) * ch;
         return <g key={i}>
@@ -54,7 +54,7 @@ function PctBars({ data }) {
   const cw = W - padL - padR, ch = H - padT - padB;
   const n = Math.max(1, data.length), group = cw / n, bw = Math.min(34, group * 0.6);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="tm-svg" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${W} ${H}`} className="tm-svg">
       <line x1={padL} x2={W - padR} y1={padT + ch} y2={padT + ch} className="tm-grid" />
       {data.map((d, i) => {
         const gx = padL + i * group + group / 2;
@@ -83,7 +83,7 @@ function ComboChart({ data }) {
     return [gx, y];
   });
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="tm-svg" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${W} ${H}`} className="tm-svg">
       {ticks.map((t, i) => {
         const y = padT + ch - t * ch;
         return <g key={i}>
