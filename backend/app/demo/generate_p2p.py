@@ -48,7 +48,14 @@ CATEGORIAS = [
 ]
 
 COMPRADORES = ["Marina Alves", "Carlos Nunes", "Renata Lima", "Paulo Souza", "Ana Lima"]
-RESOURCES   = ["Joao Silva", "Maria Souza", "Sistema", "Ana Lima"]
+RESOURCES = [
+    "Alexandre Marques", "Marina Alves", "Carlos Nunes", "Renata Lima", "Paulo Souza",
+    "Ana Lima", "Joao Silva", "Maria Souza", "Bruno Cardoso", "Fernanda Dias",
+    "Rafael Pinto", "Juliana Castro", "Eduardo Ramos", "Patricia Gomes", "Thiago Barros",
+    "Regional Sul", "Regional Sudeste", "Regional Norte", "Regional Nordeste",
+    "Regional Centro-Oeste", "Regional Sao Paulo", "Regional Industrial",
+    "Regional Varejo", "Central de Compras", "Sistema",
+]
 
 
 def _build_path(rng: random.Random) -> tuple[list[str], str]:
@@ -86,6 +93,7 @@ def build_p2p_log(n_cases: int = 2000, seed: int = 7) -> pd.DataFrame:
     rng   = random.Random(seed)
     rows  = []
     base  = pd.Timestamp("2024-12-01 08:00:00")  # ~17 meses de histórico
+    res_weights = [rng.randint(6, 30) for _ in RESOURCES]  # variação no volume por usuário
 
     for case_idx in range(1, n_cases + 1):
         case_id   = 4500000 + case_idx
@@ -122,7 +130,7 @@ def build_p2p_log(n_cases: int = 2000, seed: int = 7) -> pd.DataFrame:
                 CASE_ID:        case_id,
                 ACTIVITY:       activity,
                 TIMESTAMP:      t,
-                RESOURCE:       rng.choice(RESOURCES),
+                RESOURCE:       rng.choices(RESOURCES, weights=res_weights)[0],
                 "fornecedor":   fornecedor,
                 "produto":      produto,
                 "cancelado":    cancelado,

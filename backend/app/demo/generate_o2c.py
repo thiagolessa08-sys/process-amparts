@@ -43,7 +43,14 @@ CATEGORIAS = [
     "Eletronicos", "Alimentos", "Vestuario",
     "Moveis", "Ferramentas", "Material de Construcao",
 ]
-RESOURCES = ["Carlos Nunes", "Ana Lima", "Sistema", "Renata Lima", "Joao Silva"]
+RESOURCES = [
+    "Alexandre Marques", "Carla Mendes", "Carlos Nunes", "Ana Lima", "Renata Lima",
+    "Joao Silva", "Beatriz Rocha", "Gustavo Pires", "Larissa Moraes", "Diego Fonseca",
+    "Camila Teixeira", "Rodrigo Antunes", "Vanessa Lopes", "Felipe Araujo", "Sofia Cunha",
+    "Regional Sul", "Regional Sudeste", "Regional Norte", "Regional Nordeste",
+    "Regional Centro-Oeste", "Regional Sao Paulo", "Equipe Atacado",
+    "Equipe Varejo", "Central de Vendas", "Sistema",
+]
 
 
 def _build_path(rng: random.Random) -> tuple[list[str], str]:
@@ -98,6 +105,7 @@ def build_o2c_log(n_cases: int = 2000, seed: int = 13) -> pd.DataFrame:
     rng  = random.Random(seed)
     rows = []
     base = pd.Timestamp("2024-12-01 08:00:00")  # ~17 meses de histórico
+    res_weights = [rng.randint(6, 30) for _ in RESOURCES]  # variação no volume por usuário
 
     for case_idx in range(1, n_cases + 1):
         case_id  = 7700000 + case_idx
@@ -133,7 +141,7 @@ def build_o2c_log(n_cases: int = 2000, seed: int = 13) -> pd.DataFrame:
                 CASE_ID:             case_id,
                 ACTIVITY:            activity,
                 TIMESTAMP:           t,
-                RESOURCE:            rng.choice(RESOURCES),
+                RESOURCE:            rng.choices(RESOURCES, weights=res_weights)[0],
                 "cliente":           cliente,
                 "produto":           produto,
                 "cancelado":         cancelado,

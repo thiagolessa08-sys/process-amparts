@@ -729,6 +729,28 @@
   .tm-table tbody td:not(:first-child) { font-family: "JetBrains Mono", monospace; }
   .tm-ped { text-align: right; color: #fff !important; font-weight: 700; border-radius: 0; }
 
+  /* ============ Produtividade de usuário ============ */
+  .userprod { padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; max-width: 1640px; margin: 0 auto; }
+  .up-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .up-kpi {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-card); padding: 14px 16px 16px;
+  }
+  .up-kpi-label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+  .up-kpi-value { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; color: #2f6fe0; margin-top: 6px; line-height: 1; }
+  .up-kpi-unit { font-size: 15px; font-weight: 700; color: var(--muted); }
+  .up-kpi-desc { font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+
+  .up-area-svg { width: 100%; height: 280px; display: block; }
+  .up-empty { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  .up-seg.seg { box-shadow: none; }
+  .up-scale { display: flex; align-items: center; gap: 8px; justify-content: flex-end; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .up-scale i { width: 120px; height: 6px; border-radius: 4px; background: linear-gradient(90deg, #a9c2e3, #c39bbf, #e0617c); }
+  .up-bubbles { width: 100%; height: auto; display: block; }
+  .up-bub-name { font-size: 9.5px; font-weight: 600; fill: #fff; pointer-events: none; }
+  .up-bub-val { font-weight: 700; fill: #fff; pointer-events: none; font-family: "JetBrains Mono", monospace; }
+
   /* ============ Body split ============ */
   .body {
     display: grid;

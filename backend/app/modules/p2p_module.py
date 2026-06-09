@@ -13,6 +13,7 @@ from app.modules.headline import headline_kpis, period_filters
 from app.modules.overview import overview
 from app.modules.rework import rework
 from app.modules.twomatch import two_match
+from app.modules.userprod import user_productivity
 from app.eventlog import CASE_ID, TIMESTAMP
 
 # ── IDs canônicos ──────────────────────────────────────────────────────────────
@@ -211,6 +212,7 @@ class P2PModule(ProcessModule):
             "overview": overview(log, "fornecedor"),
             "rework": rework(log, "fornecedor", {n["id"]: n["label"] for n in nodes}),
             "twoMatch": two_match(log, "fornecedor"),
+            "userProd": user_productivity(log),
             "drill": drill,
             "filters": {
                 "variantLabel": "Variante",
