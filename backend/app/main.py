@@ -2,6 +2,9 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")  # backend/.env
+
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +21,9 @@ from app.eventlog import CASE_ID, ACTIVITY, TIMESTAMP
 
 app = FastAPI(title="Process Mining API")
 
+# cache de payloads já enriquecidos (chave = módulo + assinatura dos filtros)
+_ENRICH_CACHE: dict = {}
+
 ALLOWED_ORIGINS = os.environ.get(
     "ALLOWED_ORIGINS", "http://localhost:5173"
 ).split(",")
@@ -29,6 +35,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _prewarm():
+    """Pré-aquece o log do Cordeiro (carga ~90s do agent) em background, para o
+    usuário não esperar no primeiro clique. Silencioso se o agent estiver fora."""
+    if os.environ.get("CORDEIRO_PREWARM", "1") != "1":
+        return
+    import threading
+
+    def _warm():
+        try:
+            data_source.get_log("cordeiro")
+        except Exception as exc:  # agent indisponível / URL trocada
+            print(f"[prewarm] cordeiro não aquecido: {exc}")
+
+    threading.Thread(target=_warm, daemon=True).start()
 
 
 def _apply_filters(
@@ -130,12 +153,20 @@ def get_module(
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
+    ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, act_id, act_mode)
+    cached = _ENRICH_CACHE.get(ck)
+    if cached is not None:
+        return cached
     log = data_source.get_log(module_key=key)
     log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
     log = _apply_activity_filter(log, module, act_id, act_mode)
     if log.empty or log[CASE_ID].nunique() == 0:
         raise HTTPException(status_code=422, detail="Nenhum caso encontrado para os filtros aplicados")
-    return module.enrich(log)
+    payload = module.enrich(log)
+    if len(_ENRICH_CACHE) > 64:
+        _ENRICH_CACHE.clear()
+    _ENRICH_CACHE[ck] = payload
+    return payload
 
 
 @app.get("/api/modules/{key}/cases")
@@ -235,4 +266,5 @@ async def upload(file: UploadFile = File(...)):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     data_source.set_source(str(dest))
+    _ENRICH_CACHE.clear()
     return {"status": "ok", "filename": file.filename}

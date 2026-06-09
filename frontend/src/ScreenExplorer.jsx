@@ -16,6 +16,7 @@ function freqColor(t) {
 const IDEAL_BY_MODULE = {
   p2p: ["req", "po", "alter", "approve", "goods", "invoice", "pay"],
   o2c: ["order", "credit", "hold", "pick", "deliver", "invoice", "receive"],
+  cordeiro: ["orcamento", "canc_orc", "aprov_orc", "pedido", "canc_ped", "aprov_ped", "fatura", "canc_fat", "aprov_fat"],
 };
 
 /* ───────── subgrafo da união das variantes selecionadas ───────── */
@@ -396,6 +397,14 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
     });
   }
 
+  const allSelected = selectedIds.size === data.variants.length;
+  function toggleAll() {
+    setPlayingId(null);
+    setSelectedIds(allSelected
+      ? defaultSelection(data.variants)            // limpar → volta ao padrão (top 80%)
+      : new Set(data.variants.map((v) => v.id)));  // selecionar todas
+  }
+
   function toggleForn(d) {
     const next = localForn.includes(d) ? localForn.filter((x) => x !== d) : [...localForn, d];
     setLocalForn(next); onFiltersChange({ fornecedores: next, startDate, endDate });
@@ -451,6 +460,13 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
         )}
 
         <div>
+          <div className="vt-allbar">
+            <button className={"vt-all" + (allSelected ? " on" : "")} onClick={toggleAll}>
+              <span className="cbx"><Icon name="check" size={11} strokeWidth={3.5} /></span>
+              {allSelected ? "Limpar seleção" : "Selecionar todas"}
+            </button>
+            <span className="vt-allcount mono">{selectedIds.size}/{data.variants.length}</span>
+          </div>
           <div className="vt-head">
             <span></span><span>Variante</span><span className="r">Casos</span><span className="r">Cobertura</span><span className="r">Avg TPT</span>
           </div>

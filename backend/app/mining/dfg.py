@@ -21,33 +21,30 @@ def discover_dfg(log: pd.DataFrame) -> dict:
     """
     log = log.sort_values([CASE_ID, TIMESTAMP])
 
-    node_counts       = log[ACTIVITY].value_counts()
-    edge_counts:    dict[tuple[str, str], int]   = {}
-    edge_durations: dict[tuple[str, str], float] = {}
-    node_dwell_total: dict[str, float] = {}
-    node_dwell_count: dict[str, int]   = {}
+    node_counts = log[ACTIVITY].value_counts()
 
-    for _, group in log.groupby(CASE_ID, sort=False):
-        acts  = group[ACTIVITY].tolist()
-        times = group[TIMESTAMP].tolist()
-        for i in range(len(acts) - 1):
-            key      = (str(acts[i]), str(acts[i + 1]))
-            duration = (times[i + 1] - times[i]).total_seconds()
-            edge_counts[key]    = edge_counts.get(key, 0) + 1
-            edge_durations[key] = edge_durations.get(key, 0.0) + duration
-            act = str(acts[i])
-            node_dwell_total[act] = node_dwell_total.get(act, 0.0) + duration
-            node_dwell_count[act] = node_dwell_count.get(act, 0) + 1
+    # transições diretamente-seguem (vetorizado): linha i -> linha i+1 do mesmo caso
+    same = log[CASE_ID].to_numpy() == log[CASE_ID].shift(-1).to_numpy()
+    trans = pd.DataFrame({
+        "src": log[ACTIVITY].astype(str).to_numpy(),
+        "tgt": log[ACTIVITY].shift(-1).astype(str).to_numpy(),
+        "dur": (log[TIMESTAMP].shift(-1) - log[TIMESTAMP]).dt.total_seconds().to_numpy(),
+    })[same]
 
+    eg = trans.groupby(["src", "tgt"], sort=False)["dur"]
+    e_count, e_sum = eg.size(), eg.sum()
     edges_raw = [
         {
             "source": src,
             "target": tgt,
-            "count":  cnt,
-            "mean_duration_seconds": round(edge_durations[(src, tgt)] / cnt, 2),
+            "count":  int(cnt),
+            "mean_duration_seconds": round(float(e_sum[(src, tgt)]) / int(cnt), 2),
         }
-        for (src, tgt), cnt in edge_counts.items()
+        for (src, tgt), cnt in e_count.items()
     ]
+
+    # dwell por nó = soma das durações de saída / total de ocorrências do nó
+    node_dwell_total = trans.groupby("src")["dur"].sum()
 
     # bottleneck: z-score ≥ 1 (mean + 1 stdev) para 3+ arestas;
     # para 2 arestas, a mais lenta é gargalo; para 1, nenhuma.
@@ -71,7 +68,7 @@ def discover_dfg(log: pd.DataFrame) -> dict:
             "id":    str(act),
             "count": int(cnt),
             "avg_dwell_seconds": round(
-                node_dwell_total.get(str(act), 0.0) / int(cnt), 2
+                float(node_dwell_total.get(str(act), 0.0)) / int(cnt), 2
             ),
         }
         for act, cnt in node_counts.items()

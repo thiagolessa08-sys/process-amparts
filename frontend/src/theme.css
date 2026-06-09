@@ -918,6 +918,23 @@
   .vrow.sel .cbx { background: var(--violet); border-color: var(--violet); }
   .vrow.sel .cbx svg { opacity: 1; transform: scale(1); }
 
+  /* barra "selecionar todas" */
+  .vt-allbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 2px 4px 8px;
+  }
+  .vt-all {
+    display: flex; align-items: center; gap: 8px;
+    font-family: inherit; font-size: 12px; font-weight: 600;
+    color: var(--ink-2); background: transparent; border: none;
+    padding: 0; cursor: pointer;
+  }
+  .vt-all .cbx { width: 16px; height: 16px; }
+  .vt-all:hover { color: var(--violet); }
+  .vt-all.on .cbx { background: var(--violet); border-color: var(--violet); }
+  .vt-all.on .cbx svg { opacity: 1; transform: scale(1); }
+  .vt-allcount { margin-left: auto; font-size: 11px; color: var(--faint); }
+
   .vname { font-size: 13px; font-weight: 600; color: var(--ink); }
   .vname .hash { color: var(--faint); font-weight: 600; margin-right: 2px; }
 
