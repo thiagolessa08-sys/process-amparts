@@ -32,8 +32,11 @@ export function fetchModule(key, filters = {}) {
   return getJson(`/api/modules/${key}${qs ? "?" + qs : ""}`);
 }
 
-export function fetchCases(key, filters = {}) {
-  const qs = filterParams(filters);
+export function fetchCases(key, filters = {}, opts = {}) {
+  const params = new URLSearchParams(filterParams(filters));
+  if (opts.q && opts.q.trim()) params.set("q", opts.q.trim());
+  if (opts.limit) params.set("limit", opts.limit);
+  const qs = params.toString();
   return getJson(`/api/modules/${key}/cases${qs ? "?" + qs : ""}`);
 }
 

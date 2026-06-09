@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from app import data_source
 from app import modules as module_registry
-from app.modules.cases import build_cases
+from app.modules.cases import build_case_index, page_cases
 from app.connectors.csv_connector import CSVConnector
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
@@ -23,6 +23,9 @@ app = FastAPI(title="Process Mining API")
 
 # cache de payloads já enriquecidos (chave = módulo + assinatura dos filtros)
 _ENRICH_CACHE: dict = {}
+# cache do índice de casos (sorted_log + summary) p/ a Case Explorer não
+# re-ordenar o log inteiro a cada busca. Entradas são grandes → limite baixo.
+_CASES_CACHE: dict = {}
 
 ALLOWED_ORIGINS = os.environ.get(
     "ALLOWED_ORIGINS", "http://localhost:5173"
@@ -111,6 +114,22 @@ def _apply_activity_filter(log: pd.DataFrame, module, act_id, act_mode) -> pd.Da
     return log[log[CASE_ID].isin(cases)]
 
 
+def _guard_cordeiro(key: str) -> None:
+    """Cordeiro: carga real é assíncrona. Nunca bloqueia/recarrega dentro do
+    request — devolve 503 enquanto carrega (o front reexibe e reconsulta)."""
+    if key != "cordeiro" or data_source._state["path"] is not None:
+        return
+    st = data_source.cordeiro_status()
+    if st == "ready":
+        return
+    data_source.start_cordeiro_load()
+    if st == "error":
+        raise HTTPException(status_code=503,
+                            detail=f"Falha ao carregar Cordeiro do banco: {data_source.cordeiro_error()}")
+    raise HTTPException(status_code=503,
+                        detail="Carregando dados do Cordeiro do banco… aguarde ~1–2 min e recarregue.")
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -162,16 +181,7 @@ def get_module(
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
-    # Cordeiro: carga real é assíncrona; nunca bloqueia/recarrega dentro do request
-    if key == "cordeiro" and data_source._state["path"] is None:
-        st = data_source.cordeiro_status()
-        if st != "ready":
-            data_source.start_cordeiro_load()
-            if st == "error":
-                raise HTTPException(status_code=503,
-                                    detail=f"Falha ao carregar Cordeiro do banco: {data_source.cordeiro_error()}")
-            raise HTTPException(status_code=503,
-                                detail="Carregando dados do Cordeiro do banco… aguarde ~1–2 min e recarregue.")
+    _guard_cordeiro(key)
     ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, act_id, act_mode)
     cached = _ENRICH_CACHE.get(ck)
     if cached is not None:
@@ -198,16 +208,30 @@ def get_cases(
     mes: Optional[int] = Query(default=None),
     act_id: Optional[str] = Query(default=None),
     act_mode: Optional[str] = Query(default=None),
+    q: Optional[str] = Query(default=None),
+    limit: int = Query(default=500),
 ):
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
-    log = data_source.get_log(module_key=key)
-    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
-    log = _apply_activity_filter(log, module, act_id, act_mode)
-    if log.empty or log[CASE_ID].nunique() == 0:
-        return {"cases": []}
-    return {"cases": build_cases(log)}
+    _guard_cordeiro(key)
+
+    # índice (ordenar+resumir) é caro → cacheado por assinatura de filtro.
+    # A busca por Case Id (q) e a página (limit) ficam fora da chave: rodam barato.
+    sig = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, act_id, act_mode)
+    idx = _CASES_CACHE.get(sig)
+    if idx is None:
+        log = data_source.get_log(module_key=key)
+        log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
+        log = _apply_activity_filter(log, module, act_id, act_mode)
+        if log.empty or log[CASE_ID].nunique() == 0:
+            return {"cases": [], "total": 0}
+        idx = build_case_index(log)
+        if len(_CASES_CACHE) > 8:
+            _CASES_CACHE.clear()
+        _CASES_CACHE[sig] = idx
+    sorted_log, summary = idx
+    return page_cases(sorted_log, summary, q=q, limit=limit)
 
 
 class AskBody(BaseModel):
@@ -286,4 +310,5 @@ async def upload(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(exc))
     data_source.set_source(str(dest))
     _ENRICH_CACHE.clear()
+    _CASES_CACHE.clear()
     return {"status": "ok", "filename": file.filename}

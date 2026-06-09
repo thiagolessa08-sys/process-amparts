@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Icon } from "./icons.jsx";
 import { fetchCases } from "./api.js";
+
+const PAGE_LIMIT = 500;
 
 /* ───────── formatadores ───────── */
 function fmtDuration(s) {
@@ -74,27 +76,26 @@ function CaseDetail({ caseObj, onPrev, onNext }) {
 /* ───────── tela ───────── */
 export function CaseExplorerScreen({ data, filters }) {
   const [cases, setCases] = useState(null);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [query, setQuery] = useState("");
 
+  // busca por Case Id é server-side (escala p/ Cordeiro ~207k casos); debounce 300ms
   useEffect(() => {
     let alive = true;
     setLoading(true); setError(null);
-    fetchCases(data.key, filters)
-      .then((res) => { if (alive) { setCases(res.cases); setSelectedId(res.cases[0]?.id ?? null); } })
-      .catch((e) => { if (alive) setError(e.message); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [data.key, filters]);
+    const t = setTimeout(() => {
+      fetchCases(data.key, filters, { q: query, limit: PAGE_LIMIT })
+        .then((res) => { if (alive) { setCases(res.cases); setTotal(res.total ?? res.cases.length); setSelectedId(res.cases[0]?.id ?? null); } })
+        .catch((e) => { if (alive) setError(e.message); })
+        .finally(() => { if (alive) setLoading(false); });
+    }, 300);
+    return () => { alive = false; clearTimeout(t); };
+  }, [data.key, filters, query]);
 
-  const rows = useMemo(() => {
-    if (!cases) return [];
-    const q = query.trim().toLowerCase();
-    return q ? cases.filter((c) => c.id.toLowerCase().includes(q)) : cases;
-  }, [cases, query]);
-
+  const rows = cases || [];
   const selIndex = rows.findIndex((c) => c.id === selectedId);
   const selected = (selIndex >= 0 ? rows[selIndex] : rows[0]) || null;
   const go = (delta) => {
@@ -102,6 +103,7 @@ export function CaseExplorerScreen({ data, filters }) {
     const i = Math.max(0, Math.min(rows.length - 1, (selIndex < 0 ? 0 : selIndex) + delta));
     setSelectedId(rows[i].id);
   };
+  const capped = total > rows.length;
 
   return (
     <div className="caseexp">
@@ -111,7 +113,11 @@ export function CaseExplorerScreen({ data, filters }) {
             <Icon name="search" size={15} />
             <input placeholder="Buscar Case Id…" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
-          <span className="cex-count mono">{loading ? "…" : `${rows.length.toLocaleString("pt-BR")} casos`}</span>
+          <span className="cex-count mono" title={capped ? `Mostrando ${rows.length} de ${total} — refine a busca por Case Id` : ""}>
+            {loading ? "…" : capped
+              ? `${rows.length.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")} casos`
+              : `${total.toLocaleString("pt-BR")} casos`}
+          </span>
         </div>
         <div className="cex-table-wrap">
           <table className="cex-table">
