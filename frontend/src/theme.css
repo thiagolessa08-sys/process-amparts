@@ -750,6 +750,22 @@
   .up-bubbles { width: 100%; height: auto; display: block; }
   .up-bub-name { font-size: 9.5px; font-weight: 600; fill: #fff; pointer-events: none; }
   .up-bub-val { font-weight: 700; fill: #fff; pointer-events: none; font-family: "JetBrains Mono", monospace; }
+  .up-bub { cursor: pointer; }
+  .up-bub circle { transition: fill-opacity .12s ease; }
+  .up-bub:hover circle { fill-opacity: 1; stroke: var(--violet); stroke-width: 2; }
+
+  /* drill de usuário */
+  .up-back {
+    display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+    font-family: inherit; font-size: 13px; font-weight: 600; color: var(--violet);
+    background: var(--violet-50); border: 1px solid transparent; border-radius: 9px;
+    padding: 8px 13px; cursor: pointer; transition: background .12s;
+  }
+  .up-back:hover { background: var(--violet-100); }
+  .up-drill-title { font-size: 18px; color: var(--ink-2); }
+  .up-drill-title b { color: var(--ink); font-weight: 700; }
+  .up-kpis-6 { grid-template-columns: repeat(6, 1fr); }
+  .up-kpi-names { font-size: 14px; font-weight: 700; color: #2f6fe0; margin-top: 6px; line-height: 1.25; }
 
   /* ============ Body split ============ */
   .body {

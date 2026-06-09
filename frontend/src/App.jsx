@@ -267,7 +267,7 @@ export default function App() {
               {screen === "overview" && <div className="screen-fill" style={{ overflowY: "auto" }}><OverviewScreen key={moduleKey} data={data} /></div>}
               {screen === "rework" && <div className="screen-fill"><ReworkScreen key={moduleKey} data={data} /></div>}
               {screen === "twomatch" && <div className="screen-fill" style={{ overflowY: "auto" }}><TwoMatchScreen key={moduleKey} data={data} /></div>}
-              {screen === "userprod" && <div className="screen-fill" style={{ overflowY: "auto" }}><UserProdScreen key={moduleKey} data={data} /></div>}
+              {screen === "userprod" && <div className="screen-fill" style={{ overflowY: "auto" }}><UserProdScreen key={moduleKey} data={data} filters={filters} /></div>}
               {screen === "cases" && <div className="screen-fill"><CaseExplorerScreen key={moduleKey} data={data} filters={filters} /></div>}
               {screen === "assistant" && <div className="screen-fill"><AssistantScreen key={moduleKey} data={data} filters={filters} /></div>}
               {screen === "explorer" && <ExplorerScreen key={moduleKey} data={data} filters={filters} onFiltersChange={onFiltersChange} />}

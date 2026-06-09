@@ -203,6 +203,28 @@ def ask_module(
         raise HTTPException(status_code=502, detail=f"Falha ao consultar a IA: {exc}")
 
 
+@app.get("/api/modules/{key}/user/{name}")
+def get_user(
+    key: str,
+    name: str,
+    fornecedores: list[str] = Query(default=[]),
+    start_date: Optional[str] = Query(default=None),
+    end_date:   Optional[str] = Query(default=None),
+    ano: Optional[int] = Query(default=None),
+    mes: Optional[int] = Query(default=None),
+    act_id: Optional[str] = Query(default=None),
+    act_mode: Optional[str] = Query(default=None),
+):
+    from app.modules.userprod import user_detail
+    module = module_registry.get(key)
+    if not module:
+        raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
+    log = data_source.get_log(module_key=key)
+    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
+    log = _apply_activity_filter(log, module, act_id, act_mode)
+    return user_detail(log, name)
+
+
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...)):
     dest = Path("data/uploaded.csv")

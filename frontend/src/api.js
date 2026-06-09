@@ -32,6 +32,11 @@ export function fetchCases(key, filters = {}) {
   return getJson(`/api/modules/${key}/cases${qs ? "?" + qs : ""}`);
 }
 
+export function fetchUser(key, name, filters = {}) {
+  const qs = filterParams(filters);
+  return getJson(`/api/modules/${key}/user/${encodeURIComponent(name)}${qs ? "?" + qs : ""}`);
+}
+
 export function aiStatus() {
   return getJson("/api/ai/status");
 }
