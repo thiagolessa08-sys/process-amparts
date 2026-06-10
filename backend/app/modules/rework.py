@@ -15,7 +15,7 @@ def _case_first(log: pd.DataFrame) -> pd.DataFrame:
     return log.sort_values(TIMESTAMP).groupby(CASE_ID).first()
 
 
-def rework(log: pd.DataFrame, dim_col: str, label_map: dict) -> dict:
+def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = None) -> dict:
     first = _case_first(log)
     has = lambda c: c in first.columns  # noqa: E731
 
@@ -70,6 +70,8 @@ def rework(log: pd.DataFrame, dim_col: str, label_map: dict) -> dict:
                 "pctRetrabalho": round(100 * rw / n, 2) if n else 0.0,
             })
         por_entidade.sort(key=lambda r: r["pctRetrabalho"], reverse=True)
+        if top is not None:
+            por_entidade = por_entidade[:top]
 
     return {
         "atividades": atividades,

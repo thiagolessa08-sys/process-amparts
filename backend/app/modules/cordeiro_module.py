@@ -10,6 +10,7 @@ from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.activity_stats import activity_metrics
 from app.modules.headline import headline_kpis, period_filters
+from app.modules.rework import rework
 from app.eventlog import CASE_ID, TIMESTAMP
 
 # ── ids canônicos ───────────────────────────────────────────────────────────
@@ -69,6 +70,10 @@ class CordeiroModule(ProcessModule):
             log["cliente"] = log["customer"]
         if "value" in log.columns and "valor" not in log.columns:
             log["valor"] = log["value"]
+        # a tela de Retrabalho usa "itens" como unidade; no Cordeiro (item-level,
+        # 1 caso = 1 item) o valor financeiro é a unidade natural do O2C
+        if "valor" in log.columns and "itens" not in log.columns:
+            log["itens"] = log["valor"]
 
         total_cases  = int(log[CASE_ID].nunique())
         dfg          = discover_dfg(log)
@@ -140,7 +145,7 @@ class CordeiroModule(ProcessModule):
             "nodes": nodes, "edges": edges, "variants": variants, "kpis": kpis,
             "headlineKpis": self._safe(lambda: headline_kpis(log, total_cases), []),
             "overview": self._safe(lambda: _overview(log), {}),
-            "rework": self._safe(lambda: _rework(log, nodes), {}),
+            "rework": self._safe(lambda: rework(log, "cliente", _LABELS, top=60), {}),
             "twoMatch": {"monthly": [], "pendentes": []},
             "userProd": self._safe(lambda: _user_prod(log), {}),
             "drill": {},
@@ -208,17 +213,6 @@ def _overview(log):
                    .reset_index().sort_values("casos", ascending=False).head(15)
                    .to_dict("records"))
     return {"byMonth": by_month, "topClientes": top_cli}
-
-
-def _rework(log, nodes):
-    counts = log.groupby([CASE_ID, "activity"]).size()
-    rep = counts[counts > 1].reset_index().rename(columns={0: "n"})
-    lbl = {n["id"]: n["label"] for n in nodes}
-    agg = (rep.groupby("activity").size().reset_index(name="casos")
-           .sort_values("casos", ascending=False))
-    rows = [{"atividade": lbl.get(r["activity"], r["activity"]), "ocorrencias": int(r["casos"])}
-            for _, r in agg.iterrows()]
-    return {"atividades": rows}
 
 
 def _user_prod(log):
