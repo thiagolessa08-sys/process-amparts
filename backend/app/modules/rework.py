@@ -15,7 +15,12 @@ def _case_first(log: pd.DataFrame) -> pd.DataFrame:
     return log.sort_values(TIMESTAMP).groupby(CASE_ID).first()
 
 
-def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = None) -> dict:
+def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = None,
+           also_rework_acts=None) -> dict:
+    """also_rework_acts: atividades que marcam o caso como retrabalho só por
+    estarem presentes, sem precisar repetir (ex.: cancelamentos no O2C, onde
+    cada caso é item-level e atividades não formam loop). Cada ocorrência conta."""
+    also = set(also_rework_acts or ())
     first = _case_first(log)
     has = lambda c: c in first.columns  # noqa: E731
 
@@ -23,16 +28,21 @@ def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = N
                .groupby(CASE_ID, sort=False)["activity"].apply(list))
 
     rework_cases: set = set()
-    act_cases: dict = {}   # atividade -> casos em que repetiu
-    act_extra: dict = {}   # atividade -> total de ocorrências extras
+    act_cases: dict = {}   # atividade -> casos em que contribuiu p/ retrabalho
+    act_extra: dict = {}   # atividade -> total de ocorrências de retrabalho
     for cid, acts in seqs.items():
         cnt = Counter(acts)
-        repeated = [a for a, c in cnt.items() if c > 1]
-        if repeated:
+        flagged = False
+        for a, c in cnt.items():
+            extra = (c - 1) if c > 1 else 0   # repetições além da 1ª (loop)
+            if a in also:
+                extra += c                     # presença (ex.: cancelamento) conta cada ocorrência
+            if extra > 0:
+                act_cases.setdefault(a, set()).add(cid)
+                act_extra[a] = act_extra.get(a, 0) + extra
+                flagged = True
+        if flagged:
             rework_cases.add(cid)
-        for a in repeated:
-            act_cases.setdefault(a, set()).add(cid)
-            act_extra[a] = act_extra.get(a, 0) + (cnt[a] - 1)
 
     total = len(seqs)
     itens_by_case = first["itens"] if has("itens") else None

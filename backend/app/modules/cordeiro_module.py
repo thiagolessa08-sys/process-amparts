@@ -145,7 +145,8 @@ class CordeiroModule(ProcessModule):
             "nodes": nodes, "edges": edges, "variants": variants, "kpis": kpis,
             "headlineKpis": self._safe(lambda: headline_kpis(log, total_cases), []),
             "overview": self._safe(lambda: _overview(log), {}),
-            "rework": self._safe(lambda: rework(log, "cliente", _LABELS, top=60), {}),
+            "rework": self._safe(
+                lambda: rework(log, "cliente", _LABELS, top=60, also_rework_acts=_CANCEL), {}),
             "twoMatch": {"monthly": [], "pendentes": []},
             "userProd": self._safe(lambda: _user_prod(log), {}),
             "drill": {},
