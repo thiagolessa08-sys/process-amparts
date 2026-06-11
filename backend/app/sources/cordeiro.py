@@ -47,7 +47,7 @@ def _key(df, orc, orci, ped, pedi, fat, fati):
 
 
 def _rows(df, activity, sort, eventtime, usuario, vendedor, cliente, valor,
-          orc, orci, ped, pedi, fat, fati):
+          orc, orci, ped, pedi, fat, fati, produto="produto"):
     """Monta as linhas de uma atividade (vetorizado)."""
     out = pd.DataFrame({
         "case_id": _key(df, orc, orci, ped, pedi, fat, fati),
@@ -58,6 +58,7 @@ def _rows(df, activity, sort, eventtime, usuario, vendedor, cliente, valor,
         "vendedor": df[vendedor].fillna("—").values if vendedor in df else "—",
         "cliente": df[cliente].fillna("—").values if cliente in df else "—",
         "valor": _num(df[valor]).fillna(0).values if valor in df else 0.0,
+        "produto": df[produto].fillna("—").values if produto in df else "—",
     })
     return out.dropna(subset=["eventtime"])
 
@@ -73,7 +74,7 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
         "QuotationDocNumber, QuotationItemLine, QuotationDocInternalNumber, "
         "QuotationDocCreationDate, QuotationDocCreationTS, QuotationDocCancellationStatus, "
         "QuotationUserSignName, QuotationSalesEmployeeName, QuotationCustomerName, "
-        "QuotationItemTotal",
+        "QuotationItemTotal, QuotationItemCode",
         f"{SCHEMA}.COTACOES_SAP_PRODUCAO",
         "QuotationDocInternalNumber", "QuotationItemLine")
     o = conn.paginate_keyset(
@@ -81,7 +82,7 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
         "OrderItemBaseDocIntNumber, OrderItemBaseLine, "
         "OrderDocCreationDate, OrderDocCreationTS, OrderDocCancellationStatus, "
         "OrderUserSignName, OrderSalesEmployeeName, OrderCustomerName, "
-        "OrderItemItemTotal",
+        "OrderItemItemTotal, OrderItemCode",
         f"{SCHEMA}.PEDIDOS_SAP_PRODUCAO",
         "OrderDocInternalNumber", "OrderItemLine")
     inv = conn.paginate_keyset(
@@ -89,7 +90,7 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
         "InvoiceItemSourceDocIntNumber, InvoiceItemSourceLine, "
         "InvoiceDocCreationDate, InvoiceDocCreationTS, InvoiceDocCancellationStatus, "
         "InvoiceUserSignName, InvoiceSalesEmployeeName, InvoiceCustomerName, "
-        "InvoiceItemItemTotal",
+        "InvoiceItemItemTotal, InvoiceItemCode",
         f"{SCHEMA}.NFSAIDA_SAP_PRODUCAO",
         "InvoiceDocInternalNumber", "InvoiceItemLine")
     apr = conn.paginate_df(
@@ -136,7 +137,8 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     qoi = (q.merge(o_slim, left_on=["q_int", "q_line"], right_on=["o_bint", "o_bline"], how="left")
              .merge(i_slim, left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left")
              .rename(columns={"QuotationSalesEmployeeName": "salesemp",
-                              "QuotationCustomerName": "customer", "QuotationItemTotal": "valor"}))
+                              "QuotationCustomerName": "customer", "QuotationItemTotal": "valor",
+                              "QuotationItemCode": "produto"}))
     ts = _combine(qoi["QuotationDocCreationDate"], qoi["QuotationDocCreationTS"])
     parts.append(_rows(qoi, "CRIOU ORCAMENTO", 10, ts,
                        "QuotationUserSignName", "salesemp", "customer", "valor", *KP))
@@ -153,7 +155,8 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     oqi = (o.merge(q_slim, left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left")
              .merge(i_slim, left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left")
              .rename(columns={"OrderSalesEmployeeName": "salesemp",
-                              "OrderCustomerName": "customer", "OrderItemItemTotal": "valor"}))
+                              "OrderCustomerName": "customer", "OrderItemItemTotal": "valor",
+                              "OrderItemCode": "produto"}))
     ts = _combine(oqi["OrderDocCreationDate"], oqi["OrderDocCreationTS"])
     parts.append(_rows(oqi, "CRIOU PEDIDO", 20, ts,
                        "OrderUserSignName", "salesemp", "customer", "valor", *KP))
@@ -170,7 +173,8 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     ioq = (inv.merge(o_slim, left_on=["i_sint", "i_sline"], right_on=["o_int", "o_line"], how="left")
               .merge(q_slim, left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left")
               .rename(columns={"InvoiceSalesEmployeeName": "salesemp",
-                               "InvoiceCustomerName": "customer", "InvoiceItemItemTotal": "valor"}))
+                               "InvoiceCustomerName": "customer", "InvoiceItemItemTotal": "valor",
+                               "InvoiceItemCode": "produto"}))
     ts = _combine(ioq["InvoiceDocCreationDate"], ioq["InvoiceDocCreationTS"])
     parts.append(_rows(ioq, "CRIOU FATURA", 30, ts,
                        "InvoiceUserSignName", "salesemp", "customer", "valor", *KP))

@@ -204,16 +204,61 @@ class CordeiroModule(ProcessModule):
 
 # ── seções auxiliares (leves, independentes do schema demo) ──────────────────
 def _overview(log):
-    mes = log.assign(mes=log[TIMESTAMP].dt.strftime("%Y-%m"))
-    by_month = (mes.groupby("mes")[CASE_ID].nunique().reset_index()
-                .rename(columns={CASE_ID: "casos"}).to_dict("records"))
-    top_cli = []
+    """Visão Geral no contrato do ScreenOverview:
+    topProdutos · canceladosPorMes · topClientes(% valor) · pedidosNf."""
+    out = {"topProdutos": [], "canceladosPorMes": [], "topClientes": [], "pedidosNf": []}
+
+    # TOP 10 produtos por nº de itens (1 caso = 1 item)
+    if "produto" in log.columns:
+        cp = log.groupby(CASE_ID)["produto"].first()
+        cp = cp[(cp.notna()) & (cp != "—")]
+        out["topProdutos"] = [{"produto": str(p), "itens": int(n)}
+                              for p, n in cp.value_counts().head(10).items()]
+
+    # Pedidos cancelados por mês
+    cancp = log[log["activity"] == CANC_PED]
+    if not cancp.empty:
+        mes = cancp[TIMESTAMP].dt.strftime("%Y-%m")
+        out["canceladosPorMes"] = [{"mes": m, "count": int(c)}
+                                   for m, c in mes.value_counts().sort_index().items()]
+
+    # TOP 10 clientes por % do valor faturado (CRIOU FATURA)
+    fat = log[log["activity"] == FAT]
+    if "cliente" in log.columns and not fat.empty:
+        val = fat.groupby("cliente")["valor"].sum().sort_values(ascending=False)
+        val = val[val.index != "—"]
+        total = float(val.sum())
+        if total > 0:
+            top = val.head(10)
+            rows = [{"nome": str(c), "pct": round(100 * float(v) / total, 2)}
+                    for c, v in top.items()]
+            outros = total - float(top.sum())
+            if outros > 0.005 * total:
+                rows.append({"nome": "Outros", "pct": round(100 * outros / total, 2)})
+            out["topClientes"] = rows
+
+    # Pedidos × Nota Fiscal por cliente (case_key = ORC|ORCi|PED|PEDi|FAT|FATi)
     if "cliente" in log.columns:
-        top_cli = (log.groupby("cliente")
-                   .agg(casos=(CASE_ID, "nunique"), valor=("valor", "sum"))
-                   .reset_index().sort_values("casos", ascending=False).head(15)
-                   .to_dict("records"))
-    return {"byMonth": by_month, "topClientes": top_cli}
+        parts = log[CASE_ID].str.split("|", expand=True)
+        ped = log[log["activity"] == PED].assign(_doc=parts[2])
+        nf  = log[log["activity"] == FAT].assign(_doc=parts[4])
+        rows = []
+        for cli in ped["cliente"].value_counts().head(12).index:
+            pe = ped[ped["cliente"] == cli]
+            fe = nf[nf["cliente"] == cli]
+            rows.append({
+                "entidade": str(cli),
+                "pedidos": int(pe["_doc"][pe["_doc"] != "0"].nunique()),
+                "qtdUnid": int(len(pe)),
+                "itensPed": int(len(pe)),
+                "totalPedido": float(pe["valor"].sum()),
+                "faturas": int(fe["_doc"][fe["_doc"] != "0"].nunique()),
+                "itensFat": int(len(fe)),
+                "totalFatura": float(fe["valor"].sum()),
+            })
+        out["pedidosNf"] = rows
+
+    return out
 
 
 def _user_prod(log):
