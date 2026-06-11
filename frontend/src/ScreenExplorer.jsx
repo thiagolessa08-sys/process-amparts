@@ -12,11 +12,18 @@ function freqColor(t) {
   return `oklch(${L} ${C} 295)`;
 }
 
-// ordem ideal por módulo — usada para montar o caminho vertical do grafo
+// ordem ideal por módulo — caminho vertical (espinha) do grafo.
+// Cancelamentos NÃO entram aqui: são ramos laterais (ver BRANCH_BY_MODULE).
 const IDEAL_BY_MODULE = {
   p2p: ["req", "po", "alter", "approve", "goods", "invoice", "pay"],
   o2c: ["order", "credit", "hold", "pick", "deliver", "invoice", "receive"],
-  cordeiro: ["orcamento", "canc_orc", "aprov_orc", "pedido", "canc_ped", "aprov_ped", "fatura", "canc_fat", "aprov_fat"],
+  cordeiro: ["orcamento", "aprov_orc", "pedido", "aprov_ped", "fatura", "aprov_fat"],
+};
+
+// ramos laterais por módulo: id do nó-ramo -> id do nó da espinha de onde sai.
+// Variantes que passam por um ramo desviam visivelmente da espinha central.
+const BRANCH_BY_MODULE = {
+  cordeiro: { canc_orc: "orcamento", canc_ped: "pedido", canc_fat: "fatura" },
 };
 
 /* ───────── subgrafo da união das variantes selecionadas ───────── */
@@ -72,6 +79,7 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
   const startRef = useRef(null);
   const endRef = useRef(null);
   const [bypasses, setBypasses] = useState([]);
+  const [branchLines, setBranchLines] = useState([]);
   const [trace, setTrace] = useState(null);
 
   const primary = useMemo(() => {
@@ -82,6 +90,19 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
 
   const nodeById = useMemo(() => Object.fromEntries(graphData.nodes.map((n) => [n.id, n])), [graphData]);
   const edgeById = useMemo(() => Object.fromEntries(graphData.edges.map((e) => [e.id, e])), [graphData]);
+
+  // ramos laterais presentes no grafo, agrupados pelo nó-pai da espinha
+  const branchMap = BRANCH_BY_MODULE[moduleKey] || {};
+  const branchesByParent = useMemo(() => {
+    const present = new Set(primary);
+    const out = {};
+    for (const n of graphData.nodes) {
+      const parent = branchMap[n.id];
+      if (parent && present.has(parent)) (out[parent] ||= []).push(n.id);
+    }
+    return out;
+  }, [graphData, primary.join(","), moduleKey]);
+  const hasBranches = Object.keys(branchesByParent).length > 0;
 
   // arestas verticais (consecutivas no caminho ideal) vs bypass (resto)
   const verticalIds = new Set();
@@ -114,6 +135,32 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
     setBypasses(out);
   }, [graphData, mode, zoom, primary.join(",")]);
 
+  // conectores horizontais da espinha até cada nó-ramo (cancelamentos)
+  useLayoutEffect(() => {
+    const g = graphRef.current;
+    if (!g) { setBranchLines([]); return; }
+    const out = [];
+    for (const [parent, ids] of Object.entries(branchesByParent)) {
+      const s = nodeRefs.current[parent];
+      if (!s) continue;
+      for (const bid of ids) {
+        const t = nodeRefs.current[bid];
+        if (!t) continue;
+        const sx = s.offsetLeft + s.offsetWidth, sy = s.offsetTop + s.offsetHeight / 2;
+        const tx = t.offsetLeft, ty = t.offsetTop + t.offsetHeight / 2;
+        const midX = (sx + tx) / 2;
+        const e = edgeById[`${parent}->${bid}`];
+        out.push({
+          id: `${parent}->${bid}`,
+          d: `M ${sx} ${sy} C ${midX} ${sy}, ${midX} ${ty}, ${tx} ${ty}`,
+          lx: midX, ly: (sy + ty) / 2 - 13,
+          label: e ? (mode === "fluxo" ? e.time : fmt(e.cases)) : fmt(nodeById[bid]?.cases ?? 0),
+        });
+      }
+    }
+    setBranchLines(out);
+  }, [graphData, mode, zoom, primary.join(","), branchesByParent]);
+
   // traço do caminho da variante reproduzida: INÍCIO -> nós (na ordem) -> FIM
   useLayoutEffect(() => {
     if (!playingVariant) { setTrace(null); return; }
@@ -134,22 +181,45 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
     let prev = sc, prevOrd = -1;
     for (let i = 0; i < pathIds.length; i++) {
       const a = anchor(nodeRefs.current[pathIds[i]]);
-      const ord = primary.indexOf(pathIds[i]);
-      if (i === 0 || ord === prevOrd + 1) {
-        d += ` L ${a.cx} ${a.my}`; // trecho reto, pelo centro
+      const ord = primary.indexOf(pathIds[i]);  // -1 = nó-ramo (fora da espinha)
+      if (i === 0 || ord === -1 || ord === prevOrd + 1) {
+        // 1ª etapa, ramo lateral (centro deslocado → diverge sozinho) ou passo
+        // consecutivo na espinha: reta direta pelo centro do nó.
+        d += ` L ${a.cx} ${a.my}`;
       } else {
-        // desvio: reproduz exatamente a curva tracejada (borda esquerda, mesmo bow)
+        // pulo na espinha: reproduz a curva tracejada (borda esquerda, mesmo bow)
         const bow = Math.min(prev.lx, a.lx) - 66;
         d += ` L ${prev.lx} ${prev.my}`;                                  // conector (atrás do card)
         d += ` C ${bow} ${prev.my}, ${bow} ${a.my}, ${a.lx} ${a.my}`;     // curva = tracejada
         d += ` L ${a.cx} ${a.my}`;                                        // conector (atrás do card)
       }
-      prev = a; prevOrd = ord;
+      prev = a;
+      if (ord !== -1) prevOrd = ord;  // ramos não avançam a posição na espinha
     }
     const ec = anchor(e);
     d += ` L ${ec.cx} ${ec.my}`;
     setTrace(d);
-  }, [playingVariant, replayKey, graphData, zoom, primary.join(",")]);
+  }, [playingVariant, replayKey, graphData, zoom, primary.join(","), branchesByParent]);
+
+  const renderNode = (id, branch = false) => {
+    const node = nodeById[id];
+    if (!node) return null;
+    const ratio = node.cases / graphData.totalCases;
+    return (
+      <div className={"node" + (branch ? " branch" : "")} data-nid={id}
+        ref={(el) => { nodeRefs.current[id] = el; }}
+        onClick={(e) => onNodeClick?.(id, e.currentTarget.getBoundingClientRect())}>
+        <div className="node-accent" style={{ background: branch ? "#e5707e" : freqColor(ratio) }} />
+        <div className="node-body">
+          <div className="node-title">{node.label}</div>
+          <div className="node-stats">
+            <span className="node-count mono">{fmt(node.cases)}</span>
+            <span className={"node-pct" + (ratio < 0.999 ? " dim" : "")}>{Math.round(ratio * 100)}%</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="graph" ref={graphRef}
@@ -176,6 +246,15 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
             </g>
           ))}
         </g>
+        {branchLines.map((b) => (
+          <g key={b.id}>
+            <path className="branch-link" d={b.d} />
+            <g transform={`translate(${b.lx}, ${b.ly})`}>
+              <rect className="pill-bg" x="-28" y="-11" width="56" height="22" rx="7" />
+              <text className="branch-label" x="0" y="1" textAnchor="middle" dominantBaseline="middle">{b.label}</text>
+            </g>
+          </g>
+        ))}
         {trace && (
           <path key={replayKey} className="variant-trace" pathLength="1" d={trace} />
         )}
@@ -185,23 +264,21 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
       <div className="edge tiny"><div className="edge-track" style={{ "--flow": freqColor(0.85) }} /></div>
 
       {primary.map((id, i) => {
-        const node = nodeById[id];
-        const ratio = node.cases / graphData.totalCases;
         const nextId = primary[i + 1];
         const vEdge = nextId ? edgeById[`${id}->${nextId}`] : null;
+        const kids = branchesByParent[id] || [];
+        const box = renderNode(id);
         return (
           <div key={id} style={{ display: "contents" }}>
-            <div className="node" data-nid={id} ref={(el) => { nodeRefs.current[id] = el; }}
-              onClick={(e) => onNodeClick?.(id, e.currentTarget.getBoundingClientRect())}>
-              <div className="node-accent" style={{ background: freqColor(ratio) }} />
-              <div className="node-body">
-                <div className="node-title">{node.label}</div>
-                <div className="node-stats">
-                  <span className="node-count mono">{fmt(node.cases)}</span>
-                  <span className={"node-pct" + (ratio < 0.999 ? " dim" : "")}>{Math.round(ratio * 100)}%</span>
+            {hasBranches ? (
+              <div className="node-row">
+                <div className="branch-col" />
+                {box}
+                <div className="branch-col">
+                  {kids.map((bid) => renderNode(bid, true))}
                 </div>
               </div>
-            </div>
+            ) : box}
             {nextId && (
               <div className={"edge" + (vEdge?.bottleneck ? " bottleneck" : "")}>
                 <div className="edge-track" style={{ "--flow": vEdge?.bottleneck ? "#e5484d" : freqColor(0.6 + (vEdge ? vEdge.cases / graphData.totalCases : 0) * 0.4) }} />

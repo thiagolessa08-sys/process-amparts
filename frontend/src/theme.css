@@ -1146,6 +1146,39 @@
     animation: dash 14s linear infinite;
   }
   @keyframes dash { to { stroke-dashoffset: -160; } }
+
+  /* ramos laterais (cancelamentos) — saem da espinha para o lado */
+  .node-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+  .branch-col {
+    width: 232px;
+    flex: 0 0 232px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding-left: 36px;   /* espaço p/ o conector horizontal */
+  }
+  .node.branch { width: 178px; }
+  .node.branch .node-title { color: var(--red, #d4434a); }
+  .branch-link {
+    fill: none;
+    stroke: #e5707e;
+    stroke-width: 2;
+    stroke-dasharray: 3 5;
+    stroke-linecap: round;
+    animation: dash 14s linear infinite;
+  }
+  .branch-label {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    fill: #d4434a;
+  }
   .bypass-label {
     font-family: "JetBrains Mono", monospace;
     font-size: 10.5px;
