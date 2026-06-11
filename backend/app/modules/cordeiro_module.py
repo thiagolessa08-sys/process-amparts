@@ -11,6 +11,7 @@ from app.mining.variants import discover_variants
 from app.mining.activity_stats import activity_metrics
 from app.modules.headline import headline_kpis, period_filters
 from app.modules.rework import rework
+from app.modules.userprod import user_productivity
 from app.eventlog import CASE_ID, TIMESTAMP
 
 # ── ids canônicos ───────────────────────────────────────────────────────────
@@ -148,7 +149,7 @@ class CordeiroModule(ProcessModule):
             "rework": self._safe(
                 lambda: rework(log, "cliente", _LABELS, top=60, also_rework_acts=_CANCEL), {}),
             "twoMatch": {"monthly": [], "pendentes": []},
-            "userProd": self._safe(lambda: _user_prod(log), {}),
+            "userProd": self._safe(lambda: user_productivity(log), {}),
             "drill": {},
             "filters": {
                 "variantLabel": "Variante", "dimLabel": "Cliente", "dims": dims,
@@ -261,12 +262,3 @@ def _overview(log):
     return out
 
 
-def _user_prod(log):
-    if "resource" not in log.columns:
-        return {}
-    g = (log.groupby("resource")
-         .agg(eventos=("activity", "size"), casos=(CASE_ID, "nunique"))
-         .reset_index().sort_values("eventos", ascending=False).head(40))
-    users = [{"user": r["resource"], "events": int(r["eventos"]), "cases": int(r["casos"])}
-             for _, r in g.iterrows()]
-    return {"users": users}
