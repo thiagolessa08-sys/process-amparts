@@ -44,6 +44,12 @@ export function Icon({ name, size = 16, style, className, strokeWidth = 1.7 }) {
     minus: <line x1="5" y1="12" x2="19" y2="12"/>,
     dollar: <><line x1="12" y1="2.5" x2="12" y2="21.5"/><path d="M16.5 6.5H9.8a2.8 2.8 0 0 0 0 5.5h4.4a2.8 2.8 0 0 1 0 5.5H7"/></>,
     trendUp: <><path d="M3 17l6-6 4 4 7-7"/><path d="M17 8h4v4"/></>,
+    user: <><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></>,
+    mail: <><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,
+    lock: <><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><path d="M12 15v2.5"/></>,
+    eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></>,
+    eyeOff: <><path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a16.7 16.7 0 0 1-3.1 3.9M6.2 6.2A16.6 16.6 0 0 0 2 12s3.5 7 10 7a10.3 10.3 0 0 0 4-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m3 3 18 18"/></>,
+    logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></>,
   };
   return <svg {...p}>{paths[name] || null}</svg>;
 }

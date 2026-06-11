@@ -9,6 +9,7 @@ import { CaseExplorerScreen } from "./ScreenCaseExplorer.jsx";
 import { AssistantScreen } from "./ScreenAssistant.jsx";
 import { TwoMatchScreen } from "./ScreenTwoMatch.jsx";
 import { UserProdScreen } from "./ScreenUserProd.jsx";
+import { LoginScreen, readAuth, clearAuth } from "./ScreenLogin.jsx";
 import { fetchModule, uploadCsv } from "./api.js";
 
 const SCREENS = [
@@ -139,6 +140,7 @@ function Toast({ msg }) {
 }
 
 export default function App() {
+  const [auth, setAuth]       = useState(() => readAuth());
   const [moduleKey, setModuleKey] = useState("p2p");
   const [screen, setScreen]   = useState("explorer");
   const [dark, setDark]       = useTheme();
@@ -191,6 +193,16 @@ export default function App() {
     assistant: { title: "Assistente IA", sub: <>Pergunte sobre o processo em linguagem natural</> },
   }[screen];
 
+  if (!auth) {
+    return (
+      <LoginScreen
+        dark={dark}
+        onToggleTheme={() => setDark((d) => !d)}
+        onLogin={(user) => setAuth(user)}
+      />
+    );
+  }
+
   return (
     <div className={"shell" + (dark ? " dark" : "")}>
       {/* TOPBAR */}
@@ -218,6 +230,17 @@ export default function App() {
         </button>
         <button className="icon-btn" onClick={() => setDark(d => !d)} title="Alternar tema">
           <Icon name={dark ? "sun" : "moon"} size={17} />
+        </button>
+        <div className="user-chip" title={auth.email}>
+          <span className="user-avatar">{(auth.name || auth.email || "?").charAt(0).toUpperCase()}</span>
+          <span className="user-name">{auth.name}</span>
+        </div>
+        <button
+          className="icon-btn"
+          onClick={() => { clearAuth(); setAuth(null); }}
+          title="Sair"
+        >
+          <Icon name="logout" size={17} />
         </button>
       </header>
 
