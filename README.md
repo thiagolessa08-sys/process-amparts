@@ -50,3 +50,28 @@ backend/   API FastAPI, conectores, núcleo de mineração, gerador de dados dem
 frontend/  React + React Flow (grafo do processo)
 docs/      design e planos de implementação
 ```
+
+## Deploy (Railway)
+
+Backend e frontend são publicados no [Railway](https://railway.app) (cada um é
+um serviço, com `railway.toml` próprio). O deploy é automatizado por GitHub
+Actions (`.github/workflows/deploy.yml`): todo push na `main` publica os dois
+serviços.
+
+Para ativar (uma vez só):
+
+1. **Railway → projeto → Settings → Tokens** → gere um *Project Token*.
+2. **GitHub → repo → Settings → Secrets and variables → Actions** → crie o
+   secret `RAILWAY_TOKEN` com esse valor.
+3. Confirme que os serviços no Railway se chamam `backend` e `frontend`
+   (senão, ajuste a matriz `service` no workflow).
+
+Variáveis de ambiente importantes:
+
+- **frontend** — `VITE_API_URL` apontando para a URL pública do backend.
+- **backend** — `ALLOWED_ORIGINS` com a URL do frontend (o CORS já libera
+  `*.railway.app` por regex).
+
+Também é possível disparar manualmente em **Actions → "Deploy (Railway)" → Run
+workflow**.
+
