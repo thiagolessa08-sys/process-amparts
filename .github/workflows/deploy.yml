@@ -1,0 +1,46 @@
+# Deploy automático no Railway.
+#
+# Pré-requisitos (configurar UMA vez no GitHub → Settings):
+#   1. Secrets and variables → Actions → New repository secret
+#        RAILWAY_TOKEN = <project token gerado no Railway>
+#      (Railway → seu projeto → Settings → Tokens → "Project Token".
+#       O token é vinculado a UM ambiente, ex.: production.)
+#   2. Confirme os nomes dos serviços no Railway. Este workflow assume
+#      "backend" e "frontend". Se os seus tiverem outro nome, ajuste a
+#      matriz `service` abaixo.
+#
+# Depois disso, todo push na main publica os dois serviços. Também dá para
+# disparar manualmente em Actions → "Deploy (Railway)" → Run workflow.
+
+name: Deploy (Railway)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # não falha o segundo serviço se o primeiro falhar
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy ${{ matrix.service }}
+        working-directory: ${{ matrix.service }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --ci --service ${{ matrix.service }}
