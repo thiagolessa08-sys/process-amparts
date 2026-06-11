@@ -175,16 +175,29 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
     });
     const pathIds = playingVariant.path.filter((id) => nodeRefs.current[id]);
     if (pathIds.length === 0) { setTrace(null); return; }
+    const lastSpine = primary.length - 1;  // ordinal do último nó da espinha presente
 
-    const sc = anchor(s);
+    const sc = anchor(s), ec = anchor(e);
     let d = `M ${sc.cx} ${sc.my}`;
-    let prev = sc, prevOrd = -1;
-    for (let i = 0; i < pathIds.length; i++) {
+
+    // ── entrada: INÍCIO → 1º nó visitado ──
+    const a0 = anchor(nodeRefs.current[pathIds[0]]);
+    const ord0 = primary.indexOf(pathIds[0]);
+    if (ord0 > 0) {
+      // pulou nós iniciais da espinha → entra pela lateral (não passa reto por cima)
+      const bow = a0.lx - 66;
+      d += ` C ${bow} ${sc.my}, ${bow} ${a0.my}, ${a0.lx} ${a0.my} L ${a0.cx} ${a0.my}`;
+    } else {
+      d += ` L ${a0.cx} ${a0.my}`;
+    }
+    let prev = a0, prevOrd = ord0;
+
+    // ── passos intermediários ──
+    for (let i = 1; i < pathIds.length; i++) {
       const a = anchor(nodeRefs.current[pathIds[i]]);
       const ord = primary.indexOf(pathIds[i]);  // -1 = nó-ramo (fora da espinha)
-      if (i === 0 || ord === -1 || ord === prevOrd + 1) {
-        // 1ª etapa, ramo lateral (centro deslocado → diverge sozinho) ou passo
-        // consecutivo na espinha: reta direta pelo centro do nó.
+      if (ord === -1 || ord === prevOrd + 1) {
+        // ramo lateral (centro deslocado → diverge sozinho) ou passo consecutivo: reta.
         d += ` L ${a.cx} ${a.my}`;
       } else {
         // pulo na espinha: reproduz a curva tracejada (borda esquerda, mesmo bow)
@@ -196,8 +209,17 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
       prev = a;
       if (ord !== -1) prevOrd = ord;  // ramos não avançam a posição na espinha
     }
-    const ec = anchor(e);
-    d += ` L ${ec.cx} ${ec.my}`;
+
+    // ── saída: último nó → FIM ──
+    const ordLast = primary.indexOf(pathIds[pathIds.length - 1]);
+    if (ordLast !== -1 && ordLast < lastSpine) {
+      // parou numa etapa da espinha antes do fim → sai pela lateral (não passa reto
+      // por cima dos nós seguintes). Ramos (ordLast = -1) vão reto: já divergiram.
+      const bow = prev.lx - 66;
+      d += ` L ${prev.lx} ${prev.my} C ${bow} ${prev.my}, ${bow} ${ec.my}, ${ec.cx} ${ec.my}`;
+    } else {
+      d += ` L ${ec.cx} ${ec.my}`;
+    }
     setTrace(d);
   }, [playingVariant, replayKey, graphData, zoom, primary.join(","), branchesByParent]);
 
@@ -206,7 +228,7 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
     if (!node) return null;
     const ratio = node.cases / graphData.totalCases;
     return (
-      <div className={"node" + (branch ? " branch" : "")} data-nid={id}
+      <div key={id} className={"node" + (branch ? " branch" : "")} data-nid={id}
         ref={(el) => { nodeRefs.current[id] = el; }}
         onClick={(e) => onNodeClick?.(id, e.currentTarget.getBoundingClientRect())}>
         <div className="node-accent" style={{ background: branch ? "#e5707e" : freqColor(ratio) }} />
