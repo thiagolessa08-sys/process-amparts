@@ -207,9 +207,10 @@ class CordeiroModule(ProcessModule):
 def _headline(log, total_cases):
     """KPIs de cabeçalho do Cordeiro (modelo item-level, case = 1 item).
 
-    Qtd Pedidos  = pedidos distintos (segmento PED do case_id, ≠ 0)
-    Qtd Itens    = nº de itens = nº de casos
-    Valor Total  = faturamento real (soma do valor nas faturas criadas)
+    Qtd Pedidos    = pedidos distintos (segmento PED do case_id, ≠ 0)
+    Qtd Itens      = nº de itens = nº de casos
+    Valor Total    = soma do valor de todos os itens (1º evento de cada caso)
+    Valor Faturado = faturamento real (soma do valor nas faturas criadas)
     """
     # pedidos distintos: case_id = ORC|ORCi|PED|PEDi|FAT|FATi → índice 2 = nº do pedido
     pedidos = total_cases
@@ -220,8 +221,13 @@ def _headline(log, total_cases):
 
     itens = int(total_cases)
 
+    # valor total: soma do valor por caso (1º evento) — todo o valor movimentado
+    first = log.sort_values(TIMESTAMP).groupby(CASE_ID).first()
+    valor_total = float(first["valor"].sum()) if "valor" in first.columns else 0.0
+
+    # valor faturado: só o valor nas faturas criadas
     fat = log[log["activity"] == FAT]
-    valor = float(fat["valor"].sum()) if ("valor" in log.columns and not fat.empty) else 0.0
+    valor_fat = float(fat["valor"].sum()) if ("valor" in log.columns and not fat.empty) else 0.0
 
     return [
         {"id": "pedidos", "label": "Qtd Pedidos", "accent": "pedidos", "icon": "cart",
@@ -230,9 +236,12 @@ def _headline(log, total_cases):
         {"id": "itens", "label": "Qtd Itens", "accent": "itens", "icon": "layers",
          "value": _fmt_compact(itens), "unit": "",
          "delta": "+8,4%", "deltaDir": "up", "spark": _spark(float(itens))},
+        {"id": "valortotal", "label": "Valor Total", "accent": "valortotal", "icon": "dollar",
+         "value": _fmt_compact(valor_total), "unit": "R$",
+         "delta": "+9,3%", "deltaDir": "up", "spark": _spark(valor_total)},
         {"id": "valor", "label": "Valor Faturado", "accent": "value", "icon": "dollar",
-         "value": _fmt_compact(valor), "unit": "R$",
-         "delta": "+11,2%", "deltaDir": "up", "spark": _spark(valor)},
+         "value": _fmt_compact(valor_fat), "unit": "R$",
+         "delta": "+11,2%", "deltaDir": "up", "spark": _spark(valor_fat)},
     ]
 
 

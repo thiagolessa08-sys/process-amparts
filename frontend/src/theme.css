@@ -377,9 +377,16 @@
     --kpi-wash: radial-gradient(120% 130% at 100% 0%, rgba(24,182,166,.12), transparent 60%);
     --kpi-num: #16245c; --kpi-line: #0e9f93;
   }
+  .kpi.valortotal {
+    --kpi-accent: linear-gradient(135deg, #4f7cf5, #3b5fe0);
+    --kpi-shadow: rgba(59,95,224,.45);
+    --kpi-wash: radial-gradient(120% 130% at 100% 0%, rgba(79,124,245,.12), transparent 60%);
+    --kpi-num: #14225c; --kpi-line: #3b5fe0;
+  }
   .shell.dark .kpi.itens { --kpi-num: #cdd6ff; }
   .shell.dark .kpi.pedidos { --kpi-num: #ffd9a3; }
   .shell.dark .kpi.value { --kpi-num: #b9f0e9; }
+  .shell.dark .kpi.valortotal { --kpi-num: #c3d2ff; }
 
   /* ============ Visão Geral (overview) ============ */
   .overview { background: var(--bg); padding: 18px 20px 22px; }
