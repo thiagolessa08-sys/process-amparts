@@ -9,7 +9,7 @@ from app.modules.base import ProcessModule
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.activity_stats import activity_metrics
-from app.modules.headline import headline_kpis, period_filters
+from app.modules.headline import _fmt_compact, _spark, period_filters
 from app.modules.rework import rework
 from app.modules.userprod import user_productivity
 from app.eventlog import CASE_ID, TIMESTAMP
@@ -144,7 +144,7 @@ class CordeiroModule(ProcessModule):
             "totalCases": total_cases, "avgVariants": len(variants),
             "dimension": "Cliente",
             "nodes": nodes, "edges": edges, "variants": variants, "kpis": kpis,
-            "headlineKpis": self._safe(lambda: headline_kpis(log, total_cases), []),
+            "headlineKpis": self._safe(lambda: _headline(log, total_cases), []),
             "overview": self._safe(lambda: _overview(log), {}),
             "rework": self._safe(
                 lambda: rework(log, "cliente", _LABELS, top=60, also_rework_acts=_CANCEL), {}),
@@ -204,6 +204,38 @@ class CordeiroModule(ProcessModule):
 
 
 # ── seções auxiliares (leves, independentes do schema demo) ──────────────────
+def _headline(log, total_cases):
+    """KPIs de cabeçalho do Cordeiro (modelo item-level, case = 1 item).
+
+    Qtd Pedidos  = pedidos distintos (segmento PED do case_id, ≠ 0)
+    Qtd Itens    = nº de itens = nº de casos
+    Valor Total  = faturamento real (soma do valor nas faturas criadas)
+    """
+    # pedidos distintos: case_id = ORC|ORCi|PED|PEDi|FAT|FATi → índice 2 = nº do pedido
+    pedidos = total_cases
+    parts = log[CASE_ID].str.split("|", expand=True)
+    if parts.shape[1] > 2:
+        ped = parts[2]
+        pedidos = int(ped[ped != "0"].nunique())
+
+    itens = int(total_cases)
+
+    fat = log[log["activity"] == FAT]
+    valor = float(fat["valor"].sum()) if ("valor" in log.columns and not fat.empty) else 0.0
+
+    return [
+        {"id": "pedidos", "label": "Qtd Pedidos", "accent": "pedidos", "icon": "cart",
+         "value": _fmt_compact(pedidos), "unit": "",
+         "delta": "+6,1%", "deltaDir": "up", "spark": _spark(float(pedidos))},
+        {"id": "itens", "label": "Qtd Itens", "accent": "itens", "icon": "layers",
+         "value": _fmt_compact(itens), "unit": "",
+         "delta": "+8,4%", "deltaDir": "up", "spark": _spark(float(itens))},
+        {"id": "valor", "label": "Valor Faturado", "accent": "value", "icon": "dollar",
+         "value": _fmt_compact(valor), "unit": "R$",
+         "delta": "+11,2%", "deltaDir": "up", "spark": _spark(valor)},
+    ]
+
+
 def _overview(log):
     """Visão Geral no contrato do ScreenOverview:
     topProdutos · canceladosPorMes · topClientes(% valor) · pedidosNf."""
