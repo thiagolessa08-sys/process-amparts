@@ -622,6 +622,28 @@
   .as-text { font-size: 14px; line-height: 1.55; color: inherit; white-space: pre-wrap; word-break: break-word; }
   .as-msg.user .as-text { color: #fff; }
 
+  /* markdown renderizado (mensagens do assistente) */
+  .as-md { white-space: normal; }
+  .md > :first-child { margin-top: 0; }
+  .md > :last-child { margin-bottom: 0; }
+  .md-p { margin: 0 0 9px; }
+  .md-h { font-weight: 700; color: var(--ink); letter-spacing: -0.01em; margin: 14px 0 7px; }
+  .md-h1 { font-size: 16px; }
+  .md-h2 { font-size: 15px; }
+  .md-h3 { font-size: 14px; }
+  .md-ul, .md-ol { margin: 0 0 9px; padding-left: 20px; }
+  .md-ul { list-style: disc; }
+  .md-ol { list-style: decimal; }
+  .md-ul li, .md-ol li { margin: 3px 0; padding-left: 2px; }
+  .md-ul li::marker, .md-ol li::marker { color: var(--violet); }
+  .as-md strong { font-weight: 700; color: var(--ink); }
+  .as-md em { font-style: italic; }
+  .md-code {
+    font-family: "JetBrains Mono", monospace; font-size: 12.5px;
+    background: var(--chip); border: 1px solid var(--line-2);
+    border-radius: 5px; padding: 1px 5px;
+  }
+
   .as-steps { margin-top: 10px; border-top: 1px solid var(--line-2); padding-top: 8px; }
   .as-steps-toggle {
     display: flex; align-items: center; gap: 7px; width: 100%;

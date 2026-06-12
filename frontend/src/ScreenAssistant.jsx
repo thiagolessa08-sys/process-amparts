@@ -9,6 +9,57 @@ const SUGGESTIONS = [
   "Top 5 atividades mais frequentes",
 ];
 
+/* ───────── markdown leve (negrito, itálico, código, listas) ───────── */
+function renderInline(text) {
+  // tokeniza: **negrito** · __negrito__ · `código` · *itálico*
+  const parts = String(text).split(/(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\*[^*\n]+\*)/g);
+  return parts.map((p, i) => {
+    if (!p) return null;
+    if ((p.startsWith("**") && p.endsWith("**")) || (p.startsWith("__") && p.endsWith("__")))
+      return <strong key={i}>{p.slice(2, -2)}</strong>;
+    if (p.startsWith("`") && p.endsWith("`")) return <code key={i} className="md-code">{p.slice(1, -1)}</code>;
+    if (p.startsWith("*") && p.endsWith("*")) return <em key={i}>{p.slice(1, -1)}</em>;
+    return p;
+  });
+}
+
+function Markdown({ text }) {
+  const lines = String(text ?? "").replace(/\r\n/g, "\n").split("\n");
+  const blocks = [];
+  let list = null;
+  const flush = () => { if (list) { blocks.push(list); list = null; } };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, "");
+    const ul = line.match(/^\s*[-•*]\s+(.*)$/);
+    const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    const h  = line.match(/^(#{1,3})\s+(.*)$/);
+    if (ul) {
+      if (!list || list.type !== "ul") { flush(); list = { type: "ul", items: [] }; }
+      list.items.push(ul[1]);
+    } else if (ol) {
+      if (!list || list.type !== "ol") { flush(); list = { type: "ol", items: [] }; }
+      list.items.push(ol[1]);
+    } else if (h) {
+      flush(); blocks.push({ type: "h", level: h[1].length, text: h[2] });
+    } else if (line.trim() === "") {
+      flush();
+    } else {
+      flush(); blocks.push({ type: "p", text: line });
+    }
+  }
+  flush();
+  return (
+    <div className="md">
+      {blocks.map((b, i) => {
+        if (b.type === "ul") return <ul key={i} className="md-ul">{b.items.map((it, j) => <li key={j}>{renderInline(it)}</li>)}</ul>;
+        if (b.type === "ol") return <ol key={i} className="md-ol">{b.items.map((it, j) => <li key={j}>{renderInline(it)}</li>)}</ol>;
+        if (b.type === "h")  return <div key={i} className={"md-h md-h" + b.level}>{renderInline(b.text)}</div>;
+        return <p key={i} className="md-p">{renderInline(b.text)}</p>;
+      })}
+    </div>
+  );
+}
+
 function QueryResult({ table }) {
   if (!table) return null;
   return (
@@ -94,7 +145,9 @@ export function AssistantScreen({ data, filters }) {
           <div key={i} className={"as-msg " + m.role}>
             {m.role === "assistant" && <div className="as-av"><Icon name="activity" size={15} /></div>}
             <div className={"as-bubble" + (m.error ? " err" : "")}>
-              <div className="as-text">{m.text}</div>
+              {m.role === "assistant"
+                ? <div className="as-text as-md"><Markdown text={m.text} /></div>
+                : <div className="as-text">{m.text}</div>}
               {m.role === "assistant" && <Steps steps={m.steps} />}
             </div>
           </div>
