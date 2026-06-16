@@ -11,7 +11,7 @@ import { TwoMatchScreen } from "./ScreenTwoMatch.jsx";
 import { UserProdScreen } from "./ScreenUserProd.jsx";
 import { LoginScreen, readAuth, clearAuth } from "./ScreenLogin.jsx";
 import { QueryEditor } from "./QueryEditor.jsx";
-import { fetchModule, uploadCsv } from "./api.js";
+import { fetchModule, uploadCsv, refreshModule } from "./api.js";
 
 const SCREENS = [
   { id: "explorer", label: "Explorador", icon: "explorer" },
@@ -168,6 +168,14 @@ export default function App() {
   const onFiltersChange = useCallback((f) => { setFilters(f); load(moduleKey, f); }, [moduleKey, load]);
   const setFilter = useCallback((patch) => { onFiltersChange({ ...filters, ...patch }); }, [filters, onFiltersChange]);
 
+  async function onRefresh() {
+    flash("Recarregando dados do banco… (~1–2 min). Recarregue em instantes.");
+    try {
+      await refreshModule(moduleKey);
+      setTimeout(() => load(moduleKey, filters), 1500);
+    } catch (err) { flash(`Erro: ${err.message}`); }
+  }
+
   async function onUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -227,6 +235,11 @@ export default function App() {
         </div>
         <span className="spacer" />
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={onUpload} />
+        {(moduleKey === "cordeiro" || moduleKey === "vedara") && (
+          <button className="btn" onClick={onRefresh} title="Recarregar os dados do banco">
+            <Icon name="loop" size={15} />Atualizar dados
+          </button>
+        )}
         {moduleKey === "cordeiro" && (
           <button className="btn primary" onClick={() => setShowQueries(true)} title="Editar as queries que alimentam o Cordeiro">
             <Icon name="database" size={15} />Fonte de dados

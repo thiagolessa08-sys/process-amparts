@@ -102,6 +102,10 @@ export function resetCordeiroQueries() {
   return sendJson("/api/cordeiro/queries/reset", null);
 }
 
+export function refreshModule(key) {
+  return sendJson(`/api/modules/${key}/refresh`, null);
+}
+
 export async function uploadCsv(file) {
   const form = new FormData();
   form.append("file", file);

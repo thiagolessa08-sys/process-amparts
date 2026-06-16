@@ -221,11 +221,25 @@ def cordeiro_queries_preview(body: QueryValidateBody):
     return cq.preview_source(body.source, body.table, body.columns, body.where, limit=100)
 
 
-def _reload_cordeiro():
-    data_source.refresh("cordeiro")
+def _reload_real(key: str):
+    data_source.refresh(key)
     _ENRICH_CACHE.clear()
     _CASES_CACHE.clear()
-    data_source.start_cordeiro_load()
+    data_source.start_real_load(key)
+
+
+def _reload_cordeiro():
+    _reload_real("cordeiro")
+
+
+@app.post("/api/modules/{key}/refresh")
+def refresh_module(key: str, x_admin_token: Optional[str] = Header(default=None)):
+    """Descarta o cache da fonte real e recarrega do banco (sob demanda)."""
+    if not data_source.is_real(key):
+        raise HTTPException(status_code=400, detail=f"'{key}' não é uma fonte recarregável")
+    _require_admin(x_admin_token)
+    _reload_real(key)
+    return {"ok": True, "status": data_source.real_status(key)}
 
 
 @app.put("/api/cordeiro/queries")
