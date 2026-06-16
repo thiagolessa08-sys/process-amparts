@@ -501,8 +501,8 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
   function toggleAll() {
     setPlayingId(null);
     setSelectedIds(allSelected
-      ? defaultSelection(data.variants)            // limpar → volta ao padrão (top 80%)
-      : new Set(data.variants.map((v) => v.id)));  // selecionar todas
+      ? new Set(data.variants[0] ? [data.variants[0].id] : [])  // limpar → só a variante #1
+      : new Set(data.variants.map((v) => v.id)));               // selecionar todas
   }
 
   function toggleForn(d) {
