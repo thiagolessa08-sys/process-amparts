@@ -115,8 +115,6 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
         </div>
       ))}
 
-      <div className="ribbon-rule" />
-      <button className="btn export-btn"><Icon name="external" size={15} />Exportar</button>
     </header>
   );
 }
