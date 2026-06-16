@@ -13,6 +13,9 @@ SCHEMA = "veddara"
 ACT_TABLE = f"{SCHEMA}.SQL_PM_ATIVIDADES"
 CASE_TABLE = f"{SCHEMA}.SQL_PM_CASES"
 
+# recorte do período: só eventos a partir de 2024
+DESDE = "2024-01-01"
+
 
 def _num(s):
     return pd.to_numeric(s, errors="coerce")
@@ -26,7 +29,8 @@ def load_vedara_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     acts = conn.paginate_offset(
         "_CASE_KEY_O2C, ACTIVITY_EN, EVENTTIME, SORTING, USUARIO, VENDEDOR, "
         "CLIENTE, PRODUTO, PROD_NOME",
-        ACT_TABLE, order="_CASE_KEY_O2C, SORTING, EVENTTIME")
+        ACT_TABLE, order="_CASE_KEY_O2C, SORTING, EVENTTIME",
+        where=f"EVENTTIME >= '{DESDE}'")
     cases = conn.paginate_offset(
         "_CASE_KEY_O2C, VL_ORC_TOTAL_ITEM, NOME_REP",
         CASE_TABLE, order="_CASE_KEY_O2C")
