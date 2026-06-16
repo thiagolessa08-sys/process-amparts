@@ -43,11 +43,12 @@ app.add_middleware(
 
 @app.on_event("startup")
 def _prewarm():
-    """Pré-aquece o log do Cordeiro (carga ~90s do agent) em background, para o
-    usuário não esperar no primeiro clique. Silencioso se o agent estiver fora."""
+    """Pré-aquece os logs das fontes reais (carga ~90s do agent) em background,
+    para o usuário não esperar no primeiro clique. Silencioso se o agent estiver fora."""
     if os.environ.get("CORDEIRO_PREWARM", "1") != "1":
         return
-    data_source.start_cordeiro_load()
+    for key in data_source.REAL_LOADERS:
+        data_source.start_real_load(key)
 
 
 def _apply_filters(
@@ -116,19 +117,20 @@ def _apply_activity_filter(log: pd.DataFrame, module, act_id, act_mode) -> pd.Da
 
 
 def _guard_cordeiro(key: str) -> None:
-    """Cordeiro: carga real é assíncrona. Nunca bloqueia/recarrega dentro do
-    request — devolve 503 enquanto carrega (o front reexibe e reconsulta)."""
-    if key != "cordeiro" or data_source._state["path"] is not None:
+    """Fontes reais (cordeiro/vedara): carga assíncrona. Nunca bloqueia/recarrega
+    dentro do request — devolve 503 enquanto carrega (o front reexibe e reconsulta)."""
+    if not data_source.is_real(key) or data_source._state["path"] is not None:
         return
-    st = data_source.cordeiro_status()
+    st = data_source.real_status(key)
     if st == "ready":
         return
-    data_source.start_cordeiro_load()
+    data_source.start_real_load(key)
+    label = key.capitalize()
     if st == "error":
         raise HTTPException(status_code=503,
-                            detail=f"Falha ao carregar Cordeiro do banco: {data_source.cordeiro_error()}")
+                            detail=f"Falha ao carregar {label} do banco: {data_source.real_error(key)}")
     raise HTTPException(status_code=503,
-                        detail="Carregando dados do Cordeiro do banco… aguarde ~1–2 min e recarregue.")
+                        detail=f"Carregando dados do {label} do banco… aguarde ~1–2 min e recarregue.")
 
 
 @app.get("/api/health")

@@ -19,6 +19,8 @@ def all_keys() -> list[str]:
 from app.modules.p2p_module import P2PModule  # noqa: E402
 from app.modules.o2c_module import O2CModule  # noqa: E402
 from app.modules.cordeiro_module import CordeiroModule  # noqa: E402
+from app.modules.vedara_module import VedaraModule  # noqa: E402
 register(P2PModule())
 register(O2CModule())
 register(CordeiroModule())
+register(VedaraModule())

@@ -5,11 +5,14 @@ linhas, então há um helper de paginação por faixa de chave.
 """
 import json
 import os
+import time
 
 import httpx
 import pandas as pd
 
 PAGE = 5000
+_RETRY_EXC = (httpx.RemoteProtocolError, httpx.ReadError, httpx.ReadTimeout,
+              httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 
 
 class AgentConnector:
@@ -23,16 +26,27 @@ class AgentConnector:
     def _client(self) -> httpx.Client:
         return httpx.Client(verify=False, timeout=180)  # inspeção SSL corporativa
 
-    def query(self, sql: str, limit: int = PAGE) -> dict:
-        with self._client() as c:
-            r = c.post(
-                f"{self.url}/query",
-                headers={"X-API-Key": self.key, "Content-Type": "application/json"},
-                json={"sql": sql, "limit": limit},
-            )
-            r.raise_for_status()
-            # strict=False: descrições de item podem conter chars de controle (\n, \t)
-            return json.loads(r.text, strict=False)
+    def query(self, sql: str, limit: int = PAGE, _tries: int = 4) -> dict:
+        # SELECT é idempotente → retry em quedas transientes do túnel/agent
+        last = None
+        for attempt in range(_tries):
+            try:
+                with self._client() as c:
+                    r = c.post(
+                        f"{self.url}/query",
+                        headers={"X-API-Key": self.key, "Content-Type": "application/json"},
+                        json={"sql": sql, "limit": limit},
+                    )
+                    r.raise_for_status()
+                    # O agent rotula como UTF-8, mas o conteúdo é cp1252 (Sybase/Windows):
+                    # decodificar os bytes crus como cp1252 recupera os acentos corretos.
+                    # strict=False: descrições podem conter chars de controle (\n, \t).
+                    text = r.content.decode("cp1252", errors="replace")
+                    return json.loads(text, strict=False)
+            except _RETRY_EXC as exc:  # noqa: PERF203
+                last = exc
+                time.sleep(1.5 * (attempt + 1))
+        raise last
 
     def query_df(self, sql: str, limit: int = PAGE) -> pd.DataFrame:
         d = self.query(sql, limit)
@@ -62,6 +76,24 @@ class AgentConnector:
                 break
             frames.append(df)
             last = df["k"].iloc[-1]
+            pages += 1
+            if len(df) < PAGE:
+                break
+        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+    def paginate_offset(self, select: str, frm: str, order: str,
+                        where: str = "", max_pages: int = 400) -> pd.DataFrame:
+        """Paginação por offset (TOP n START AT m) — para tabelas sem chave numérica
+        natural (ex.: event log já pronto). ORDER BY estável é obrigatório."""
+        frames, start, pages = [], 1, 0
+        while pages < max_pages:
+            wc = f" WHERE {where}" if where else ""
+            sql = f"SELECT TOP {PAGE} START AT {start} {select} FROM {frm}{wc} ORDER BY {order}"
+            df = self.query_df(sql)
+            if df.empty:
+                break
+            frames.append(df)
+            start += len(df)
             pages += 1
             if len(df) < PAGE:
                 break

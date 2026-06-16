@@ -1,9 +1,10 @@
 """Mantem qual event log esta ativo por módulo.
 
 Fontes demo (p2p/o2c) são carregadas sob demanda do CSV. Fontes reais caras
-(cordeiro) são carregadas UMA vez em background (thread), nunca dentro do request
-HTTP — para não estourar memória/timeout no servidor de produção.
+(cordeiro, vedara) são carregadas UMA vez em background (thread), nunca dentro
+do request HTTP — para não estourar memória/timeout no servidor de produção.
 """
+import importlib
 import threading
 from pathlib import Path
 
@@ -22,66 +23,94 @@ DEMO_WRITERS = {
     "o2c": write_o2c,
 }
 
-_state = {"path": None}                      # override manual (upload)
-_cache: dict[str, pd.DataFrame] = {}         # logs de fontes reais (caros de carregar)
-_cordeiro = {"loading": False, "error": None}
+# fontes reais (banco via agent): módulo:função do loader
+REAL_LOADERS = {
+    "cordeiro": ("app.sources.cordeiro", "load_cordeiro_eventlog"),
+    "vedara":   ("app.sources.vedara",   "load_vedara_eventlog"),
+}
+
+_state = {"path": None}                       # override manual (upload)
+_cache: dict[str, pd.DataFrame] = {}          # logs de fontes reais (caros)
+_real = {k: {"loading": False, "error": None} for k in REAL_LOADERS}
 _lock = threading.Lock()
 
 
-# ── Cordeiro (carga em background) ───────────────────────────────────────────
-def _bg_load_cordeiro() -> None:
+# ── fontes reais (carga em background) ───────────────────────────────────────
+def _load_real(key: str) -> pd.DataFrame:
+    mod, fn = REAL_LOADERS[key]
+    return getattr(importlib.import_module(mod), fn)()
+
+
+def _bg_load(key: str) -> None:
     try:
-        from app.sources.cordeiro import load_cordeiro_eventlog
-        _cache["cordeiro"] = load_cordeiro_eventlog()
-        _cordeiro["error"] = None
+        _cache[key] = _load_real(key)
+        _real[key]["error"] = None
     except Exception as exc:  # noqa: BLE001
-        _cordeiro["error"] = str(exc)
-        print(f"[cordeiro] falha ao carregar: {exc}")
+        _real[key]["error"] = str(exc)
+        print(f"[{key}] falha ao carregar: {exc}")
     finally:
-        _cordeiro["loading"] = False
+        _real[key]["loading"] = False
 
 
-def start_cordeiro_load() -> None:
-    """Dispara a carga em background (idempotente)."""
+def start_real_load(key: str) -> None:
+    """Dispara a carga em background de uma fonte real (idempotente)."""
+    if key not in REAL_LOADERS:
+        return
     with _lock:
-        if "cordeiro" in _cache or _cordeiro["loading"]:
+        if key in _cache or _real[key]["loading"]:
             return
-        _cordeiro["loading"] = True
-        _cordeiro["error"] = None
-    threading.Thread(target=_bg_load_cordeiro, daemon=True).start()
+        _real[key]["loading"] = True
+        _real[key]["error"] = None
+    threading.Thread(target=_bg_load, args=(key,), daemon=True).start()
 
 
-def cordeiro_status() -> str:
+def real_status(key: str) -> str:
     """ready | loading | error | idle"""
-    if "cordeiro" in _cache:
+    if key in _cache:
         return "ready"
-    if _cordeiro["loading"]:
+    if _real.get(key, {}).get("loading"):
         return "loading"
-    if _cordeiro["error"]:
+    if _real.get(key, {}).get("error"):
         return "error"
     return "idle"
 
 
+def real_error(key: str) -> str | None:
+    return _real.get(key, {}).get("error")
+
+
+def is_real(key: str) -> bool:
+    return key in REAL_LOADERS
+
+
+# compat: helpers antigos do Cordeiro
+def start_cordeiro_load() -> None:
+    start_real_load("cordeiro")
+
+
+def cordeiro_status() -> str:
+    return real_status("cordeiro")
+
+
 def cordeiro_error() -> str | None:
-    return _cordeiro["error"]
+    return real_error("cordeiro")
 
 
 def refresh(module_key: str) -> None:
     """Descarta o cache de uma fonte real para forçar recarga."""
     _cache.pop(module_key, None)
-    if module_key == "cordeiro":
-        _cordeiro["error"] = None
+    if module_key in _real:
+        _real[module_key]["error"] = None
 
 
 # ── API geral ────────────────────────────────────────────────────────────────
 def get_log(module_key: str = "p2p") -> pd.DataFrame:
-    if _state["path"] is None and module_key == "cordeiro":
-        if "cordeiro" in _cache:
-            return _cache["cordeiro"]
+    if _state["path"] is None and module_key in REAL_LOADERS:
+        if module_key in _cache:
+            return _cache[module_key]
         # fallback (ex.: testes/CLI): carga síncrona sob demanda
-        from app.sources.cordeiro import load_cordeiro_eventlog
-        _cache["cordeiro"] = load_cordeiro_eventlog()
-        return _cache["cordeiro"]
+        _cache[module_key] = _load_real(module_key)
+        return _cache[module_key]
     path = _state["path"]
     if path is None:
         demo = DEMO_PATHS.get(module_key, DEMO_PATHS["p2p"])

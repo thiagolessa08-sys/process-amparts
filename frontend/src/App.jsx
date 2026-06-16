@@ -221,14 +221,18 @@ export default function App() {
           <button className={moduleKey === "cordeiro" ? "on" : ""} onClick={() => setModuleKey("cordeiro")}>
             <span className="pdot" style={{ background: "#7b54ee" }} />Cordeiro
           </button>
+          <button className={moduleKey === "vedara" ? "on" : ""} onClick={() => setModuleKey("vedara")}>
+            <span className="pdot" style={{ background: "#0e9f93" }} />Vedara
+          </button>
         </div>
         <span className="spacer" />
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={onUpload} />
-        {moduleKey === "cordeiro" ? (
+        {moduleKey === "cordeiro" && (
           <button className="btn primary" onClick={() => setShowQueries(true)} title="Editar as queries que alimentam o Cordeiro">
             <Icon name="database" size={15} />Fonte de dados
           </button>
-        ) : (
+        )}
+        {(moduleKey === "p2p" || moduleKey === "o2c") && (
           <>
             <button className="btn" onClick={() => fileRef.current.click()}><Icon name="upload" size={15} />Importar CSV</button>
             <button className="btn primary" onClick={() => { load(moduleKey, EMPTY_FILTERS); setFilters(EMPTY_FILTERS); flash("Dataset demo carregado"); }}>

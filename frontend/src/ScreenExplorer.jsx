@@ -83,7 +83,8 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
   const [trace, setTrace] = useState(null);
 
   const primary = useMemo(() => {
-    const order   = IDEAL_BY_MODULE[moduleKey] || IDEAL_BY_MODULE.p2p;
+    // ordem da espinha: hardcoded por módulo, ou vinda do payload (módulos data-driven)
+    const order   = IDEAL_BY_MODULE[moduleKey] || graphData.idealOrder || IDEAL_BY_MODULE.p2p;
     const present = new Set(graphData.nodes.map((n) => n.id));
     return order.filter((id) => present.has(id));
   }, [graphData, moduleKey]);
@@ -92,7 +93,7 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
   const edgeById = useMemo(() => Object.fromEntries(graphData.edges.map((e) => [e.id, e])), [graphData]);
 
   // ramos laterais presentes no grafo, agrupados pelo nó-pai da espinha
-  const branchMap = BRANCH_BY_MODULE[moduleKey] || {};
+  const branchMap = BRANCH_BY_MODULE[moduleKey] || graphData.branchMap || {};
   const branchesByParent = useMemo(() => {
     const present = new Set(primary);
     const out = {};
