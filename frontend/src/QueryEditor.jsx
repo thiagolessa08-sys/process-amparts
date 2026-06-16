@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Icon } from "./icons.jsx";
 import {
-  fetchCordeiroQueries, validateCordeiroQuery,
+  fetchCordeiroQueries, validateCordeiroQuery, previewCordeiroQuery,
   saveCordeiroQueries, resetCordeiroQueries,
 } from "./api.js";
 
@@ -12,7 +12,9 @@ export function QueryEditor({ onClose, onApplied }) {
   const [edits, setEdits] = useState({});      // {source: {table, columns, where}}
   const [active, setActive] = useState(null);
   const [results, setResults] = useState({});  // {source: {ok, columns, missing, error, ai}}
+  const [previews, setPreviews] = useState({}); // {source: {ok, columns, rows, error}}
   const [validating, setValidating] = useState(false);
+  const [running, setRunning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -26,7 +28,8 @@ export function QueryEditor({ onClose, onApplied }) {
 
   function setField(f, v) {
     setEdits((e) => ({ ...e, [active]: { ...e[active], [f]: v } }));
-    setResults((r) => ({ ...r, [active]: undefined }));  // edição invalida o resultado
+    setResults((r) => ({ ...r, [active]: undefined }));   // edição invalida resultado
+    setPreviews((p) => ({ ...p, [active]: undefined }));
   }
 
   async function validate() {
@@ -38,6 +41,17 @@ export function QueryEditor({ onClose, onApplied }) {
     } catch (e) {
       setResults((rs) => ({ ...rs, [active]: { ok: false, error: e.message, missing: [], columns: [] } }));
     } finally { setValidating(false); }
+  }
+
+  async function run() {
+    setRunning(true);
+    const cur = edits[active];
+    try {
+      const r = await previewCordeiroQuery(active, cur.table, cur.columns, cur.where || "");
+      setPreviews((ps) => ({ ...ps, [active]: r }));
+    } catch (e) {
+      setPreviews((ps) => ({ ...ps, [active]: { ok: false, error: e.message, columns: [], rows: [] } }));
+    } finally { setRunning(false); }
   }
 
   async function save() {
@@ -69,6 +83,7 @@ export function QueryEditor({ onClose, onApplied }) {
 
   const cur = edits[active] || { table: "", columns: "", where: "" };
   const res = results[active];
+  const prev = previews[active];
   const anyBroken = meta.order.some((s) => results[s] && results[s].ok === false);
 
   return (
@@ -117,10 +132,15 @@ export function QueryEditor({ onClose, onApplied }) {
           </div>
 
           <div className="qe-runbar">
-            <button className="btn" onClick={validate} disabled={validating}>
+            <button className="btn" onClick={validate} disabled={validating || running}>
               {validating
                 ? <><Icon name="activity" size={14} className="spin" /> Validando…</>
                 : <><Icon name="check" size={14} /> Validar query</>}
+            </button>
+            <button className="btn" onClick={run} disabled={validating || running}>
+              {running
+                ? <><Icon name="activity" size={14} className="spin" /> Rodando…</>
+                : <><Icon name="play" size={13} /> Rodar (top 100)</>}
             </button>
             {!meta.aiConfigured && <span className="qe-hint">IA não configurada — só validação básica</span>}
           </div>
@@ -142,6 +162,29 @@ export function QueryEditor({ onClose, onApplied }) {
                 </div>
               )}
             </div>
+          )}
+
+          {prev && (
+            prev.error
+              ? <div className="qe-result bad"><div className="qe-result-head"><Icon name="alert" size={15} /> Erro ao rodar a query.</div><pre className="qe-code err">{prev.error}</pre></div>
+              : (
+                <div className="qe-preview">
+                  <div className="qe-preview-head">
+                    <Icon name="check" size={14} /> {prev.rows.length} linha{prev.rows.length === 1 ? "" : "s"} (top 100) · {prev.columns.length} colunas
+                  </div>
+                  <div className="qe-table-wrap">
+                    <table className="qe-table">
+                      <thead><tr>{prev.columns.map((c, i) => <th key={i}>{c}</th>)}</tr></thead>
+                      <tbody>
+                        {prev.rows.map((row, ri) => (
+                          <tr key={ri}>{row.map((v, ci) => <td key={ci} title={v == null ? "" : String(v)}>{v == null ? "—" : String(v)}</td>)}</tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {prev.rows.length === 0 && <div className="qe-preview-empty">A query não retornou linhas.</div>}
+                  </div>
+                </div>
+              )
           )}
         </div>
 

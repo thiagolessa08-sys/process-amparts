@@ -1398,7 +1398,7 @@
   display: grid; place-items: center; padding: 24px;
 }
 .qe-modal {
-  width: min(760px, 96vw); max-height: 92vh; display: flex; flex-direction: column;
+  width: min(1040px, 96vw); max-height: 94vh; display: flex; flex-direction: column;
   background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
   box-shadow: 0 24px 70px -18px rgba(20,22,40,.5); overflow: hidden;
 }
@@ -1454,6 +1454,21 @@
 .qe-ai { margin-top: 10px; border-top: 1px dashed var(--line-2); padding-top: 9px; }
 .qe-ai-l { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--violet); margin-bottom: 4px; }
 .qe-ai-txt { font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+
+/* preview (rodar top 100) */
+.qe-preview { margin-top: 14px; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+.qe-preview-head { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--ink-2);
+  padding: 9px 12px; background: var(--inset); border-bottom: 1px solid var(--line); }
+.qe-preview-head svg { color: var(--green); }
+.qe-table-wrap { max-height: 320px; overflow: auto; }
+.qe-table { border-collapse: collapse; font-size: 11.5px; white-space: nowrap; }
+.qe-table thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); text-align: left;
+  font-family: var(--mono); font-weight: 700; color: var(--faint); font-size: 10.5px;
+  padding: 7px 10px; border-bottom: 1px solid var(--line); }
+.qe-table tbody td { font-family: var(--mono); color: var(--ink-2); padding: 6px 10px;
+  border-bottom: 1px solid var(--line-2); max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.qe-table tbody tr:hover { background: var(--hover); }
+.qe-preview-empty { padding: 16px; text-align: center; color: var(--muted); font-size: 12.5px; }
 
 .qe-foot { display: flex; align-items: center; gap: 9px; padding: 13px 18px; border-top: 1px solid var(--line); background: var(--inset); }
 .qe-warn { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--red); }

@@ -151,19 +151,41 @@ def is_customized() -> bool:
     return _config_path().exists()
 
 
-def probe_sql(source: str, table: str, columns: str, where: str) -> str:
-    """SQL de validação (TOP 1) espelhando a estrutura real da fonte."""
+def probe_sql(source: str, table: str, columns: str, where: str, top: int = 1) -> str:
+    """SQL (TOP N) espelhando a estrutura real da fonte (validação/preview)."""
     st = STRUCT[source]
     wc = f" WHERE {where}" if where and where.strip() else ""
     if st["kind"] == "group":
-        return (f"SELECT TOP 1 {columns} FROM {table}{wc} "
+        return (f"SELECT TOP {top} {columns} FROM {table}{wc} "
                 f"GROUP BY {st['group']} ORDER BY {st['key']}")
-    return (f"SELECT TOP 1 {st['k1']} AS kk1, {st['k2']} AS kk2, {columns} "
+    return (f"SELECT TOP {top} {st['k1']} AS kk1, {st['k2']} AS kk2, {columns} "
             f"FROM {table}{wc} ORDER BY {st['k1']}, {st['k2']}")
 
 
+def _err_msg(exc) -> str:
+    msg = str(exc)
+    resp = getattr(exc, "response", None)  # httpx: corpo traz o erro SQL do agent
+    if resp is not None:
+        try:
+            body = (resp.text or "").strip()
+            if body:
+                msg = f"{msg} — {body[:500]}"
+        except Exception:
+            pass
+    return msg
+
+
+def _cell(v):
+    import math
+    if v is None:
+        return None
+    if isinstance(v, float) and math.isnan(v):
+        return None
+    return v if isinstance(v, (str, int, float, bool)) else str(v)
+
+
 def validate_source(source: str, table: str, columns: str, where: str, conn=None) -> dict:
-    """Roda a query de prova e confere as colunas obrigatórias.
+    """Roda a query de prova (TOP 1) e confere as colunas obrigatórias.
 
     Retorna {ok, sql, columns, missing, error}.
     """
@@ -179,18 +201,35 @@ def validate_source(source: str, table: str, columns: str, where: str, conn=None
     try:
         df = conn.query_df(sql, limit=1)
     except Exception as exc:  # noqa: BLE001
-        msg = str(exc)
-        resp = getattr(exc, "response", None)  # httpx: corpo traz o erro SQL do agent
-        if resp is not None:
-            try:
-                body = (resp.text or "").strip()
-                if body:
-                    msg = f"{msg} — {body[:500]}"
-            except Exception:
-                pass
-        return {"ok": False, "sql": sql, "columns": [], "missing": [], "error": msg}
+        return {"ok": False, "sql": sql, "columns": [], "missing": [], "error": _err_msg(exc)}
 
     returned = [str(c).strip() for c in df.columns]
     ret_lower = {c.lower() for c in returned}
     missing = [c for c in REQUIRED_COLUMNS[source] if c.lower() not in ret_lower]
     return {"ok": not missing, "sql": sql, "columns": returned, "missing": missing, "error": None}
+
+
+def preview_source(source: str, table: str, columns: str, where: str,
+                   limit: int = 100, conn=None) -> dict:
+    """Executa a query trazendo TOP N linhas para conferência.
+
+    Retorna {ok, sql, columns, rows, error}.
+    """
+    from app.connectors.agent_connector import AgentConnector
+    if source not in STRUCT:
+        return {"ok": False, "sql": "", "columns": [], "rows": [],
+                "error": f"Fonte desconhecida: {source}"}
+    limit = max(1, min(int(limit), 1000))
+    sql = probe_sql(source, table, columns, where, top=limit)
+    conn = conn or AgentConnector()
+    if not conn.configured():
+        return {"ok": False, "sql": sql, "columns": [], "rows": [],
+                "error": "AGENT_URL/AGENT_API_KEY não configurados"}
+    try:
+        df = conn.query_df(sql, limit=limit)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "sql": sql, "columns": [], "rows": [], "error": _err_msg(exc)}
+
+    cols = [str(c).strip() for c in df.columns]
+    rows = [[_cell(v) for v in r] for r in df.itertuples(index=False, name=None)]
+    return {"ok": True, "sql": sql, "columns": cols, "rows": rows, "error": None}

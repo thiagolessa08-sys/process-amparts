@@ -90,6 +90,10 @@ export function validateCordeiroQuery(source, table, columns, where) {
   return sendJson("/api/cordeiro/queries/validate", { source, table, columns, where });
 }
 
+export function previewCordeiroQuery(source, table, columns, where) {
+  return sendJson("/api/cordeiro/queries/preview", { source, table, columns, where });
+}
+
 export function saveCordeiroQueries(sources) {
   return sendJson("/api/cordeiro/queries", { sources }, "PUT");
 }

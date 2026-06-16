@@ -212,6 +212,13 @@ def cordeiro_queries_validate(body: QueryValidateBody):
     return res
 
 
+@app.post("/api/cordeiro/queries/preview")
+def cordeiro_queries_preview(body: QueryValidateBody):
+    if body.source not in cq.STRUCT:
+        raise HTTPException(status_code=400, detail=f"Fonte desconhecida: {body.source}")
+    return cq.preview_source(body.source, body.table, body.columns, body.where, limit=100)
+
+
 def _reload_cordeiro():
     data_source.refresh("cordeiro")
     _ENRICH_CACHE.clear()
