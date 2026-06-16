@@ -45,7 +45,7 @@ function Spark({ data }) {
 }
 
 /* uma faixa: título + filtros + KPIs + exportar */
-function Ribbon({ data, headInfo, filters, setFilter, onEditQueries }) {
+function Ribbon({ data, headInfo, filters, setFilter }) {
   const f = data.filters || {};
   const fornVal = filters.fornecedores?.[0] ?? "";
   return (
@@ -116,11 +116,6 @@ function Ribbon({ data, headInfo, filters, setFilter, onEditQueries }) {
       ))}
 
       <div className="ribbon-rule" />
-      {data.key === "cordeiro" && (
-        <button className="btn" onClick={onEditQueries} title="Editar as queries que alimentam o Cordeiro">
-          <Icon name="database" size={15} />Fonte de dados
-        </button>
-      )}
       <button className="btn export-btn"><Icon name="external" size={15} />Exportar</button>
     </header>
   );
@@ -231,10 +226,18 @@ export default function App() {
         </div>
         <span className="spacer" />
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={onUpload} />
-        <button className="btn" onClick={() => fileRef.current.click()}><Icon name="upload" size={15} />Importar CSV</button>
-        <button className="btn primary" onClick={() => { load(moduleKey, EMPTY_FILTERS); setFilters(EMPTY_FILTERS); flash("Dataset demo carregado"); }}>
-          <Icon name="database" size={15} />Carregar dataset demo
-        </button>
+        {moduleKey === "cordeiro" ? (
+          <button className="btn primary" onClick={() => setShowQueries(true)} title="Editar as queries que alimentam o Cordeiro">
+            <Icon name="database" size={15} />Fonte de dados
+          </button>
+        ) : (
+          <>
+            <button className="btn" onClick={() => fileRef.current.click()}><Icon name="upload" size={15} />Importar CSV</button>
+            <button className="btn primary" onClick={() => { load(moduleKey, EMPTY_FILTERS); setFilters(EMPTY_FILTERS); flash("Dataset demo carregado"); }}>
+              <Icon name="database" size={15} />Carregar dataset demo
+            </button>
+          </>
+        )}
         <button className="icon-btn" onClick={() => setDark(d => !d)} title="Alternar tema">
           <Icon name={dark ? "sun" : "moon"} size={17} />
         </button>
@@ -278,8 +281,7 @@ export default function App() {
         {/* APP */}
         <div className="app">
           {data ? (
-            <Ribbon data={data} headInfo={headInfo} filters={filters} setFilter={setFilter}
-              onEditQueries={() => setShowQueries(true)} />
+            <Ribbon data={data} headInfo={headInfo} filters={filters} setFilter={setFilter} />
           ) : (
             <header className="ribbon">
               <div className="title-block"><div className="title-row"><h1>{headInfo.title}</h1></div></div>
