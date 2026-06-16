@@ -48,12 +48,13 @@ class AgentConnector:
         """
         frames, last, pages = [], None, 0
         while pages < max_pages:
-            cond = []
+            # chave NULL não pagina nem agrega de forma confiável → exclui
+            cond = [f"{key} IS NOT NULL"]
             if where:
                 cond.append(f"({where})")
             if last is not None:
                 cond.append(f"{key} > {last}")
-            wc = (" WHERE " + " AND ".join(cond)) if cond else ""
+            wc = " WHERE " + " AND ".join(cond)
             gc = f" GROUP BY {group}" if group else ""
             sql = f"SELECT TOP {PAGE} {select} FROM {frm}{wc}{gc} ORDER BY {key}"
             df = self.query_df(sql)
@@ -73,19 +74,23 @@ class AgentConnector:
         sel = f"{k1} AS kk1, {k2} AS kk2, {select}"
         frames, l1, l2, pages = [], None, None, 0
         while pages < max_pages:
-            cond = []
+            # chave interna NULL não pode keyset (e não casa nas junções) → exclui,
+            # senão NULLs (que ordenam primeiro) podem encher uma página e quebrar o avanço
+            cond = [f"{k1} IS NOT NULL", f"{k2} IS NOT NULL"]
             if where:
                 cond.append(f"({where})")
             if l1 is not None:
                 cond.append(f"({k1} > {l1} OR ({k1} = {l1} AND {k2} > {l2}))")
-            wc = (" WHERE " + " AND ".join(cond)) if cond else ""
+            wc = " WHERE " + " AND ".join(cond)
             sql = f"SELECT TOP {PAGE} {sel} FROM {frm}{wc} ORDER BY {k1}, {k2}"
             df = self.query_df(sql)
             if df.empty:
                 break
             frames.append(df)
-            l1 = int(float(df["kk1"].iloc[-1]))
-            l2 = int(float(df["kk2"].iloc[-1]))
+            last1, last2 = df["kk1"].iloc[-1], df["kk2"].iloc[-1]
+            if pd.isna(last1) or pd.isna(last2):  # defensivo (não deve ocorrer com o filtro)
+                break
+            l1, l2 = int(float(last1)), int(float(last2))
             pages += 1
             if len(df) < PAGE:
                 break

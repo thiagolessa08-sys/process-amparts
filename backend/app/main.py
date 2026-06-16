@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")  # backend/.env
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -14,6 +14,7 @@ from app import data_source
 from app import modules as module_registry
 from app.modules.cases import build_case_index, page_cases
 from app.connectors.csv_connector import CSVConnector
+from app.sources import cordeiro_queries as cq
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.stats import compute_statistics
@@ -165,6 +166,74 @@ def debug_config():
         "cordeiro_status": data_source.cordeiro_status(),
         "cordeiro_error": data_source.cordeiro_error(),
     }
+
+
+def _require_admin(token: Optional[str]) -> None:
+    """Gate opcional: se ADMIN_TOKEN existir no ambiente, exige o header."""
+    admin = os.environ.get("ADMIN_TOKEN")
+    if admin and token != admin:
+        raise HTTPException(status_code=403, detail="Token de administração inválido")
+
+
+class QueryValidateBody(BaseModel):
+    source: str
+    table: str
+    columns: str
+    where: str = ""
+
+
+class QuerySaveBody(BaseModel):
+    sources: dict
+
+
+@app.get("/api/cordeiro/queries")
+def cordeiro_queries_get():
+    return {
+        "order": cq.ORDER,
+        "labels": cq.LABELS,
+        "sources": cq.get_config(),
+        "required": cq.REQUIRED_COLUMNS,
+        "defaults": cq.DEFAULT_QUERIES,
+        "customized": cq.is_customized(),
+        "aiConfigured": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "status": data_source.cordeiro_status(),
+    }
+
+
+@app.post("/api/cordeiro/queries/validate")
+def cordeiro_queries_validate(body: QueryValidateBody):
+    if body.source not in cq.STRUCT:
+        raise HTTPException(status_code=400, detail=f"Fonte desconhecida: {body.source}")
+    res = cq.validate_source(body.source, body.table, body.columns, body.where)
+    from app.ai.query_review import review_query
+    res["ai"] = review_query(
+        cq.LABELS.get(body.source, body.source), res["sql"],
+        res["error"], res["missing"], cq.REQUIRED_COLUMNS[body.source])
+    return res
+
+
+def _reload_cordeiro():
+    data_source.refresh("cordeiro")
+    _ENRICH_CACHE.clear()
+    _CASES_CACHE.clear()
+    data_source.start_cordeiro_load()
+
+
+@app.put("/api/cordeiro/queries")
+def cordeiro_queries_save(body: QuerySaveBody,
+                          x_admin_token: Optional[str] = Header(default=None)):
+    _require_admin(x_admin_token)
+    cfg = cq.save_config(body.sources)
+    _reload_cordeiro()
+    return {"ok": True, "sources": cfg, "status": data_source.cordeiro_status()}
+
+
+@app.post("/api/cordeiro/queries/reset")
+def cordeiro_queries_reset(x_admin_token: Optional[str] = Header(default=None)):
+    _require_admin(x_admin_token)
+    cq.reset_config()
+    _reload_cordeiro()
+    return {"ok": True, "sources": cq.get_config(), "status": data_source.cordeiro_status()}
 
 
 @app.get("/api/modules/{key}")

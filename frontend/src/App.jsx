@@ -10,6 +10,7 @@ import { AssistantScreen } from "./ScreenAssistant.jsx";
 import { TwoMatchScreen } from "./ScreenTwoMatch.jsx";
 import { UserProdScreen } from "./ScreenUserProd.jsx";
 import { LoginScreen, readAuth, clearAuth } from "./ScreenLogin.jsx";
+import { QueryEditor } from "./QueryEditor.jsx";
 import { fetchModule, uploadCsv } from "./api.js";
 
 const SCREENS = [
@@ -44,7 +45,7 @@ function Spark({ data }) {
 }
 
 /* uma faixa: título + filtros + KPIs + exportar */
-function Ribbon({ data, headInfo, filters, setFilter }) {
+function Ribbon({ data, headInfo, filters, setFilter, onEditQueries }) {
   const f = data.filters || {};
   const fornVal = filters.fornecedores?.[0] ?? "";
   return (
@@ -115,6 +116,11 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
       ))}
 
       <div className="ribbon-rule" />
+      {data.key === "cordeiro" && (
+        <button className="btn" onClick={onEditQueries} title="Editar as queries que alimentam o Cordeiro">
+          <Icon name="database" size={15} />Fonte de dados
+        </button>
+      )}
       <button className="btn export-btn"><Icon name="external" size={15} />Exportar</button>
     </header>
   );
@@ -150,6 +156,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [showQueries, setShowQueries] = useState(false);
   const fileRef = useRef(null);
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2400); };
@@ -271,7 +278,8 @@ export default function App() {
         {/* APP */}
         <div className="app">
           {data ? (
-            <Ribbon data={data} headInfo={headInfo} filters={filters} setFilter={setFilter} />
+            <Ribbon data={data} headInfo={headInfo} filters={filters} setFilter={setFilter}
+              onEditQueries={() => setShowQueries(true)} />
           ) : (
             <header className="ribbon">
               <div className="title-block"><div className="title-row"><h1>{headInfo.title}</h1></div></div>
@@ -305,6 +313,16 @@ export default function App() {
       </div>
 
       {drill && <DrillDrawer drill={drill} onClose={() => setDrill(null)} />}
+      {showQueries && (
+        <QueryEditor
+          onClose={() => setShowQueries(false)}
+          onApplied={() => {
+            setShowQueries(false);
+            flash("Recarregando o Cordeiro com as novas queries… (~1–2 min)");
+            load(moduleKey, filters);
+          }}
+        />
+      )}
       <Toast msg={toast} />
     </div>
   );

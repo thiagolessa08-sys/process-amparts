@@ -19,6 +19,7 @@ import gc
 import pandas as pd
 
 from ..connectors.agent_connector import AgentConnector
+from . import cordeiro_queries as cq
 
 SCHEMA = "cordeiro"
 
@@ -39,6 +40,16 @@ def _combine(date_s, tod_s):
     hhmmss = tod_s.astype(str).str.extract(r"(\d{2}:\d{2}:\d{2})")[0]
     tod = pd.to_timedelta(hhmmss, errors="coerce").fillna(pd.Timedelta(0))
     return d + tod
+
+
+def _lk(df, keys):
+    """Frame de lookup p/ merge: remove linhas com chave NaN.
+
+    O pandas casa NaN==NaN em merge (≠ SQL); sem isso, linhas sem chave de um
+    lado cruzariam com TODAS as sem chave do outro → produto cartesiano (OOM).
+    Chave nula não é uma ligação real, então a remoção também é mais correta.
+    """
+    return df.dropna(subset=list(keys))
 
 
 def _key(df, orc, orci, ped, pedi, fat, fati):
@@ -69,36 +80,25 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     if not conn.configured():
         raise RuntimeError("AGENT_URL/AGENT_API_KEY não configurados")
 
+    # consultas-base editáveis (colunas/tabela/where vêm da config; chaves e
+    # group são fixos no modelo). Ver app.sources.cordeiro_queries.
+    cfg = cq.get_config()
+    sc = cq.STRUCT
+
     # itens (paginação keyset por intnum+linha) — só colunas usadas, p/ poupar memória
     q = conn.paginate_keyset(
-        "QuotationDocNumber, QuotationItemLine, QuotationDocInternalNumber, "
-        "QuotationDocCreationDate, QuotationDocCreationTS, QuotationDocCancellationStatus, "
-        "QuotationUserSignName, QuotationSalesEmployeeName, QuotationCustomerName, "
-        "QuotationItemTotal, QuotationItemCode",
-        f"{SCHEMA}.COTACOES_SAP_PRODUCAO",
-        "QuotationDocInternalNumber", "QuotationItemLine")
+        cfg["cotacoes"]["columns"], cfg["cotacoes"]["table"],
+        sc["cotacoes"]["k1"], sc["cotacoes"]["k2"], where=cfg["cotacoes"]["where"])
     o = conn.paginate_keyset(
-        "OrderDocNumber, OrderItemLine, OrderDocInternalNumber, "
-        "OrderItemBaseDocIntNumber, OrderItemBaseLine, "
-        "OrderDocCreationDate, OrderDocCreationTS, OrderDocCancellationStatus, "
-        "OrderUserSignName, OrderSalesEmployeeName, OrderCustomerName, "
-        "OrderItemItemTotal, OrderItemCode",
-        f"{SCHEMA}.PEDIDOS_SAP_PRODUCAO",
-        "OrderDocInternalNumber", "OrderItemLine")
+        cfg["pedidos"]["columns"], cfg["pedidos"]["table"],
+        sc["pedidos"]["k1"], sc["pedidos"]["k2"], where=cfg["pedidos"]["where"])
     inv = conn.paginate_keyset(
-        "InvoiceDocNumber, InvoiceItemLine, InvoiceDocInternalNumber, "
-        "InvoiceItemSourceDocIntNumber, InvoiceItemSourceLine, "
-        "InvoiceDocCreationDate, InvoiceDocCreationTS, InvoiceDocCancellationStatus, "
-        "InvoiceUserSignName, InvoiceSalesEmployeeName, InvoiceCustomerName, "
-        "InvoiceItemItemTotal, InvoiceItemCode",
-        f"{SCHEMA}.NFSAIDA_SAP_PRODUCAO",
-        "InvoiceDocInternalNumber", "InvoiceItemLine")
+        cfg["nfsaida"]["columns"], cfg["nfsaida"]["table"],
+        sc["nfsaida"]["k1"], sc["nfsaida"]["k2"], where=cfg["nfsaida"]["where"])
     apr = conn.paginate_df(
-        "DocumentInternalNumber k, DocumentType dtype, MAX(DocumentApprovalStatus) st, "
-        "MAX(DocumentItemApprovalDate) adate, MAX(DocumentItemApprovalTime) atime, "
-        "MAX(DocumentCurrStepName) step",
-        f"{SCHEMA}.APROVACOES_SAP_PRODUCAO", "DocumentInternalNumber",
-        group="DocumentInternalNumber, DocumentType")
+        cfg["aprovacoes"]["columns"], cfg["aprovacoes"]["table"],
+        sc["aprovacoes"]["key"], where=cfg["aprovacoes"]["where"],
+        group=sc["aprovacoes"]["group"])
 
     # chaves numéricas p/ join
     q["q_int"], q["q_line"] = _num(q["QuotationDocInternalNumber"]), _num(q["QuotationItemLine"])
@@ -128,14 +128,15 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
         if ok.empty:
             return
         ok["k"] = _num(ok["k"])
+        ok = _lk(ok, ["k"])
         m = persp.merge(ok, left_on=intcol, right_on="k", how="inner")
         if not m.empty:
             parts.append(_rows(m, activity, sort, m["appr_ts"], "step",
                                "salesemp", "customer", "valor", *KP))
 
     # ── ORÇAMENTO ──
-    qoi = (q.merge(o_slim, left_on=["q_int", "q_line"], right_on=["o_bint", "o_bline"], how="left")
-             .merge(i_slim, left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left")
+    qoi = (q.merge(_lk(o_slim, ["o_bint", "o_bline"]), left_on=["q_int", "q_line"], right_on=["o_bint", "o_bline"], how="left")
+             .merge(_lk(i_slim, ["i_sint", "i_sline"]), left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left")
              .rename(columns={"QuotationSalesEmployeeName": "salesemp",
                               "QuotationCustomerName": "customer", "QuotationItemTotal": "valor",
                               "QuotationItemCode": "produto"}))
@@ -152,8 +153,8 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     gc.collect()
 
     # ── PEDIDO ──
-    oqi = (o.merge(q_slim, left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left")
-             .merge(i_slim, left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left")
+    oqi = (o.merge(_lk(q_slim, ["q_int", "q_line"]), left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left")
+             .merge(_lk(i_slim, ["i_sint", "i_sline"]), left_on=["o_int", "o_line"], right_on=["i_sint", "i_sline"], how="left")
              .rename(columns={"OrderSalesEmployeeName": "salesemp",
                               "OrderCustomerName": "customer", "OrderItemItemTotal": "valor",
                               "OrderItemCode": "produto"}))
@@ -170,8 +171,8 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     gc.collect()
 
     # ── FATURA ──
-    ioq = (inv.merge(o_slim, left_on=["i_sint", "i_sline"], right_on=["o_int", "o_line"], how="left")
-              .merge(q_slim, left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left")
+    ioq = (inv.merge(_lk(o_slim, ["o_int", "o_line"]), left_on=["i_sint", "i_sline"], right_on=["o_int", "o_line"], how="left")
+              .merge(_lk(q_slim, ["q_int", "q_line"]), left_on=["o_bint", "o_bline"], right_on=["q_int", "q_line"], how="left")
               .rename(columns={"InvoiceSalesEmployeeName": "salesemp",
                                "InvoiceCustomerName": "customer", "InvoiceItemItemTotal": "valor",
                                "InvoiceItemCode": "produto"}))
