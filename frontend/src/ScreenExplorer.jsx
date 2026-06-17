@@ -57,6 +57,11 @@ export function defaultSelection(variants) {
   return ids;
 }
 
+// seleção inicial do Explorer: só a variante #1
+function onlyFirst(variants) {
+  return new Set(variants[0] ? [variants[0].id] : []);
+}
+
 /* ───────── Donut ───────── */
 function Donut({ pct }) {
   const r = 30, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
@@ -425,7 +430,7 @@ export function DrillDrawer({ drill, onClose }) {
 
 /* ───────── Explorer screen ───────── */
 export function ExplorerScreen({ data, filters, onFiltersChange }) {
-  const [selectedIds, setSelectedIds] = useState(() => defaultSelection(data.variants));
+  const [selectedIds, setSelectedIds] = useState(() => onlyFirst(data.variants));
   const [playingId, setPlayingId] = useState(null);
   const [replayKey, setReplayKey] = useState(0);
   const [mode, setMode] = useState("fluxo");
@@ -456,7 +461,7 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
   const [startDate, setStartDate] = useState(filters?.startDate ?? "");
   const [endDate, setEndDate]     = useState(filters?.endDate ?? "");
 
-  useEffect(() => { setSelectedIds(defaultSelection(data.variants)); setPlayingId(null); setPopover(null); }, [data]);
+  useEffect(() => { setSelectedIds(onlyFirst(data.variants)); setPlayingId(null); setPopover(null); }, [data]);
 
   const nodeMeta = useMemo(() => Object.fromEntries(data.nodes.map((n) => [n.id, n])), [data]);
   function onNodeClick(id, rect) {
@@ -501,8 +506,8 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
   function toggleAll() {
     setPlayingId(null);
     setSelectedIds(allSelected
-      ? new Set(data.variants[0] ? [data.variants[0].id] : [])  // limpar → só a variante #1
-      : new Set(data.variants.map((v) => v.id)));               // selecionar todas
+      ? onlyFirst(data.variants)                    // limpar → só a variante #1
+      : new Set(data.variants.map((v) => v.id)));   // selecionar todas
   }
 
   function toggleForn(d) {
