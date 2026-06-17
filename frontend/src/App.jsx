@@ -11,7 +11,7 @@ import { TwoMatchScreen } from "./ScreenTwoMatch.jsx";
 import { UserProdScreen } from "./ScreenUserProd.jsx";
 import { LoginScreen, readAuth, clearAuth } from "./ScreenLogin.jsx";
 import { QueryEditor } from "./QueryEditor.jsx";
-import { fetchModule, uploadCsv, refreshModule } from "./api.js";
+import { fetchModule, fetchModuleStatus, uploadCsv, refreshModule } from "./api.js";
 
 const SCREENS = [
   { id: "explorer", label: "Explorador", icon: "explorer" },
@@ -148,6 +148,8 @@ export default function App() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
+  const [polling, setPolling] = useState(false);   // fonte real carregando
+  const [progress, setProgress] = useState(0);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [showQueries, setShowQueries] = useState(false);
   const fileRef = useRef(null);
@@ -157,10 +159,32 @@ export default function App() {
 
   const load = useCallback(async (key, f) => {
     setLoading(true); setError(null);
-    try { setData(await fetchModule(key, f)); }
-    catch (e) { setError(e.message); }
-    finally { setLoading(false); }
+    try {
+      setData(await fetchModule(key, f));
+      setPolling(false);
+    } catch (e) {
+      if (e.status === 503) { setData(null); setProgress((p) => p || 0); setPolling(true); }
+      else { setPolling(false); setError(e.message); }
+    } finally { setLoading(false); }
   }, []);
+
+  // enquanto a fonte real carrega: faz polling do status e atualiza sozinho ao concluir
+  useEffect(() => {
+    if (!polling) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const s = await fetchModuleStatus(moduleKey);
+        if (!alive) return;
+        setProgress(s.progress || 0);
+        if (s.status === "ready") { setPolling(false); load(moduleKey, filters); }
+        else if (s.status === "error") { setPolling(false); setError(s.error || "Falha ao carregar do banco"); }
+      } catch { /* mantém o polling */ }
+    };
+    tick();
+    const id = setInterval(tick, 2000);
+    return () => { alive = false; clearInterval(id); };
+  }, [polling, moduleKey, filters, load]);
 
   useEffect(() => { setFilters(EMPTY_FILTERS); load(moduleKey, EMPTY_FILTERS); }, [moduleKey, load]);
   useEffect(() => { setDrill(null); }, [moduleKey, screen]);
@@ -303,17 +327,26 @@ export default function App() {
             </header>
           )}
 
-          {loading && (
+          {polling && (
+            <div className="real-loading">
+              <div className="rl-spin"><Icon name="activity" size={30} className="spin" /></div>
+              <div className="rl-title">Carregando dados do banco…</div>
+              <div className="rl-sub">Pode levar ~1–2 min. A tela atualiza sozinha ao concluir.</div>
+              <div className="rl-bar"><i style={{ width: `${Math.max(4, progress)}%` }} /></div>
+              <div className="rl-pct mono">{Math.round(progress)}%</div>
+            </div>
+          )}
+          {loading && !polling && (
             <div style={{ display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 14 }}>
               <span><Icon name="activity" size={18} className="spin" style={{ marginRight: 8, verticalAlign: -3 }} />Carregando…</span>
             </div>
           )}
-          {error && !loading && (
+          {error && !loading && !polling && (
             <div style={{ padding: 40, color: "var(--crit)", fontSize: 13 }}>
               <Icon name="alert" size={16} style={{ marginRight: 8, verticalAlign: -3 }} />Erro ao carregar: {error}
             </div>
           )}
-          {!loading && !error && data && (
+          {!loading && !error && !polling && data && (
             <>
               {screen === "overview" && <div className="screen-fill" style={{ overflowY: "auto" }}><OverviewScreen key={moduleKey} data={data} /></div>}
               {screen === "rework" && <div className="screen-fill"><ReworkScreen key={moduleKey} data={data} /></div>}

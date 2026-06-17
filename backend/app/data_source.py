@@ -31,20 +31,30 @@ REAL_LOADERS = {
 
 _state = {"path": None}                       # override manual (upload)
 _cache: dict[str, pd.DataFrame] = {}          # logs de fontes reais (caros)
-_real = {k: {"loading": False, "error": None} for k in REAL_LOADERS}
+_real = {k: {"loading": False, "error": None, "progress": 0} for k in REAL_LOADERS}
 _lock = threading.Lock()
 
 
+def _set_progress(key: str, pct) -> None:
+    if key in _real:
+        _real[key]["progress"] = max(0, min(100, int(pct)))
+
+
 # ── fontes reais (carga em background) ───────────────────────────────────────
-def _load_real(key: str) -> pd.DataFrame:
+def _load_real(key: str, progress=None) -> pd.DataFrame:
     mod, fn = REAL_LOADERS[key]
-    return getattr(importlib.import_module(mod), fn)()
+    try:
+        return getattr(importlib.import_module(mod), fn)(progress=progress)
+    except TypeError:
+        # loader antigo sem o parâmetro progress (fallback)
+        return getattr(importlib.import_module(mod), fn)()
 
 
 def _bg_load(key: str) -> None:
     try:
-        _cache[key] = _load_real(key)
+        _cache[key] = _load_real(key, progress=lambda p: _set_progress(key, p))
         _real[key]["error"] = None
+        _real[key]["progress"] = 100
     except Exception as exc:  # noqa: BLE001
         _real[key]["error"] = str(exc)
         print(f"[{key}] falha ao carregar: {exc}")
@@ -61,6 +71,7 @@ def start_real_load(key: str) -> None:
             return
         _real[key]["loading"] = True
         _real[key]["error"] = None
+        _real[key]["progress"] = 0
     threading.Thread(target=_bg_load, args=(key,), daemon=True).start()
 
 
@@ -77,6 +88,10 @@ def real_status(key: str) -> str:
 
 def real_error(key: str) -> str | None:
     return _real.get(key, {}).get("error")
+
+
+def real_progress(key: str) -> int:
+    return int(_real.get(key, {}).get("progress", 0))
 
 
 def is_real(key: str) -> bool:

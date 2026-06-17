@@ -75,7 +75,8 @@ def _rows(df, activity, sort, eventtime, usuario, vendedor, cliente, valor,
 
 
 # ── carga ────────────────────────────────────────────────────────────────────
-def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
+def load_cordeiro_eventlog(conn: AgentConnector | None = None, progress=None) -> pd.DataFrame:
+    progress = progress or (lambda p: None)
     conn = conn or AgentConnector()
     if not conn.configured():
         raise RuntimeError("AGENT_URL/AGENT_API_KEY não configurados")
@@ -84,21 +85,26 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     # group são fixos no modelo). Ver app.sources.cordeiro_queries.
     cfg = cq.get_config()
     sc = cq.STRUCT
+    progress(5)
 
     # itens (paginação keyset por intnum+linha) — só colunas usadas, p/ poupar memória
     q = conn.paginate_keyset(
         cfg["cotacoes"]["columns"], cfg["cotacoes"]["table"],
         sc["cotacoes"]["k1"], sc["cotacoes"]["k2"], where=cfg["cotacoes"]["where"])
+    progress(25)
     o = conn.paginate_keyset(
         cfg["pedidos"]["columns"], cfg["pedidos"]["table"],
         sc["pedidos"]["k1"], sc["pedidos"]["k2"], where=cfg["pedidos"]["where"])
+    progress(45)
     inv = conn.paginate_keyset(
         cfg["nfsaida"]["columns"], cfg["nfsaida"]["table"],
         sc["nfsaida"]["k1"], sc["nfsaida"]["k2"], where=cfg["nfsaida"]["where"])
+    progress(65)
     apr = conn.paginate_df(
         cfg["aprovacoes"]["columns"], cfg["aprovacoes"]["table"],
         sc["aprovacoes"]["key"], where=cfg["aprovacoes"]["where"],
         group=sc["aprovacoes"]["group"])
+    progress(75)
 
     # chaves numéricas p/ join
     q["q_int"], q["q_line"] = _num(q["QuotationDocInternalNumber"]), _num(q["QuotationItemLine"])
@@ -188,6 +194,7 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
     del ioq, cancf
     gc.collect()
 
+    progress(90)
     log = pd.concat(parts, ignore_index=True)
     log["eventtime"] = pd.to_datetime(log["eventtime"], errors="coerce")
     log = log.dropna(subset=["eventtime"])

@@ -82,9 +82,10 @@ class AgentConnector:
         return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
     def paginate_offset(self, select: str, frm: str, order: str,
-                        where: str = "", max_pages: int = 400) -> pd.DataFrame:
+                        where: str = "", max_pages: int = 400, on_rows=None) -> pd.DataFrame:
         """Paginação por offset (TOP n START AT m) — para tabelas sem chave numérica
-        natural (ex.: event log já pronto). ORDER BY estável é obrigatório."""
+        natural (ex.: event log já pronto). ORDER BY estável é obrigatório.
+        on_rows(total): callback opcional de progresso com o nº de linhas já carregadas."""
         frames, start, pages = [], 1, 0
         while pages < max_pages:
             wc = f" WHERE {where}" if where else ""
@@ -95,6 +96,8 @@ class AgentConnector:
             frames.append(df)
             start += len(df)
             pages += 1
+            if on_rows:
+                on_rows(start - 1)
             if len(df) < PAGE:
                 break
         return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()

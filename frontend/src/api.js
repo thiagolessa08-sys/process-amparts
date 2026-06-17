@@ -32,6 +32,10 @@ export function fetchModule(key, filters = {}) {
   return getJson(`/api/modules/${key}${qs ? "?" + qs : ""}`);
 }
 
+export function fetchModuleStatus(key) {
+  return getJson(`/api/modules/${key}/status`);
+}
+
 export function fetchCases(key, filters = {}, opts = {}) {
   const params = new URLSearchParams(filterParams(filters));
   if (opts.q && opts.q.trim()) params.set("q", opts.q.trim());

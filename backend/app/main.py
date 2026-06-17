@@ -232,6 +232,18 @@ def _reload_cordeiro():
     _reload_real("cordeiro")
 
 
+@app.get("/api/modules/{key}/status")
+def module_status(key: str):
+    """Status de carga de uma fonte: ready | loading | error | idle + progresso %."""
+    if not data_source.is_real(key):
+        return {"status": "ready", "progress": 100, "error": None}
+    return {
+        "status": data_source.real_status(key),
+        "progress": data_source.real_progress(key),
+        "error": data_source.real_error(key),
+    }
+
+
 @app.post("/api/modules/{key}/refresh")
 def refresh_module(key: str, x_admin_token: Optional[str] = Header(default=None)):
     """Descarta o cache da fonte real e recarrega do banco (sob demanda)."""

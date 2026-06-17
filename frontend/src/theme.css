@@ -1470,6 +1470,25 @@
 .qe-table tbody tr:hover { background: var(--hover); }
 .qe-preview-empty { padding: 16px; text-align: center; color: var(--muted); font-size: 12.5px; }
 
+/* tela de carregamento das fontes reais (banco) */
+.real-loading {
+  height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 40px; text-align: center;
+}
+.rl-spin { color: var(--violet); }
+.rl-title { font-size: 16px; font-weight: 700; color: var(--ink); margin-top: 4px; }
+.rl-sub { font-size: 12.5px; color: var(--muted); }
+.rl-bar {
+  width: min(420px, 70%); height: 8px; margin-top: 12px;
+  background: var(--inset); border: 1px solid var(--line); border-radius: 999px; overflow: hidden;
+}
+.rl-bar i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #7b54ee, #5a2fe0);
+  transition: width .4s cubic-bezier(.3,.7,.3,1);
+}
+.rl-pct { font-size: 13px; font-weight: 700; color: var(--violet); font-variant-numeric: tabular-nums; }
+
 .qe-foot { display: flex; align-items: center; gap: 9px; padding: 13px 18px; border-top: 1px solid var(--line); background: var(--inset); }
 .qe-warn { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--red); }
 .qe-foot .btn.ghost { background: transparent; }

@@ -21,19 +21,29 @@ def _num(s):
     return pd.to_numeric(s, errors="coerce")
 
 
-def load_vedara_eventlog(conn: AgentConnector | None = None) -> pd.DataFrame:
+def load_vedara_eventlog(conn: AgentConnector | None = None, progress=None) -> pd.DataFrame:
+    progress = progress or (lambda p: None)
     conn = conn or AgentConnector()
     if not conn.configured():
         raise RuntimeError("AGENT_URL/AGENT_API_KEY não configurados")
+
+    # total p/ % honesto (a tabela de eventos é a parte pesada)
+    total = conn.query_df(
+        f"SELECT COUNT(*) AS n FROM {ACT_TABLE} WHERE EVENTTIME >= '{DESDE}'", limit=1)
+    total = max(int(total["n"].iloc[0]) if not total.empty else 1, 1)
+    progress(3)
 
     acts = conn.paginate_offset(
         "_CASE_KEY_O2C, ACTIVITY_EN, EVENTTIME, SORTING, USUARIO, VENDEDOR, "
         "CLIENTE, PRODUTO, PROD_NOME",
         ACT_TABLE, order="_CASE_KEY_O2C, SORTING, EVENTTIME",
-        where=f"EVENTTIME >= '{DESDE}'")
+        where=f"EVENTTIME >= '{DESDE}'",
+        on_rows=lambda n: progress(3 + 80 * min(n, total) / total))
+    progress(84)
     cases = conn.paginate_offset(
         "_CASE_KEY_O2C, VL_ORC_TOTAL_ITEM, NOME_REP",
         CASE_TABLE, order="_CASE_KEY_O2C")
+    progress(90)
 
     eventtime = pd.to_datetime(acts["EVENTTIME"], errors="coerce")
     sort = _num(acts["SORTING"]).fillna(0)
