@@ -58,16 +58,22 @@ def _apply_filters(
     end_date: Optional[str],
     ano: Optional[int] = None,
     mes: Optional[int] = None,
+    dia: Optional[int] = None,
+    produto: Optional[str] = None,
 ) -> pd.DataFrame:
-    """Filtra o event log por fornecedor/cliente, período e/ou ano e mês do pedido."""
+    """Filtra o event log por fornecedor/cliente, período, dia e/ou produto."""
     if fornecedores:
         dim = "fornecedor" if "fornecedor" in log.columns else (
             "cliente" if "cliente" in log.columns else None)
         if dim:
             log = log[log[dim].isin(fornecedores)]
 
-    if ano or mes:
-        # filtra pelo ano/mês do primeiro evento do caso (data do pedido)
+    if produto and "produto" in log.columns:
+        cases_with = log[log["produto"] == produto][CASE_ID].unique()
+        log = log[log[CASE_ID].isin(cases_with)]
+
+    if ano or mes or dia:
+        # filtra pelo ano/mês/dia do primeiro evento do caso (data do pedido)
         log[TIMESTAMP] = pd.to_datetime(log[TIMESTAMP])
         case_start = log.groupby(CASE_ID)[TIMESTAMP].min()
         valid = case_start
@@ -75,6 +81,8 @@ def _apply_filters(
             valid = valid[valid.dt.year == ano]
         if mes:
             valid = valid[valid.dt.month == mes]
+        if dia:
+            valid = valid[valid.dt.day == dia]
         log = log[log[CASE_ID].isin(valid.index)]
 
     if start_date or end_date:
@@ -279,6 +287,8 @@ def get_module(
     end_date:   Optional[str] = Query(default=None),
     ano: Optional[int] = Query(default=None),
     mes: Optional[int] = Query(default=None),
+    dia: Optional[int] = Query(default=None),
+    produto: Optional[str] = Query(default=None),
     act_id: Optional[str] = Query(default=None),
     act_mode: Optional[str] = Query(default=None),
 ):
@@ -286,12 +296,12 @@ def get_module(
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
     _guard_cordeiro(key)
-    ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, act_id, act_mode)
+    ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, dia, produto, act_id, act_mode)
     cached = _ENRICH_CACHE.get(ck)
     if cached is not None:
         return cached
     log = data_source.get_log(module_key=key)
-    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
+    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto)
     log = _apply_activity_filter(log, module, act_id, act_mode)
     if log.empty or log[CASE_ID].nunique() == 0:
         raise HTTPException(status_code=422, detail="Nenhum caso encontrado para os filtros aplicados")
@@ -310,6 +320,8 @@ def get_cases(
     end_date:   Optional[str] = Query(default=None),
     ano: Optional[int] = Query(default=None),
     mes: Optional[int] = Query(default=None),
+    dia: Optional[int] = Query(default=None),
+    produto: Optional[str] = Query(default=None),
     act_id: Optional[str] = Query(default=None),
     act_mode: Optional[str] = Query(default=None),
     q: Optional[str] = Query(default=None),
@@ -322,11 +334,11 @@ def get_cases(
 
     # índice (ordenar+resumir) é caro → cacheado por assinatura de filtro.
     # A busca por Case Id (q) e a página (limit) ficam fora da chave: rodam barato.
-    sig = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, act_id, act_mode)
+    sig = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, dia, produto, act_id, act_mode)
     idx = _CASES_CACHE.get(sig)
     if idx is None:
         log = data_source.get_log(module_key=key)
-        log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
+        log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto)
         log = _apply_activity_filter(log, module, act_id, act_mode)
         if log.empty or log[CASE_ID].nunique() == 0:
             return {"cases": [], "total": 0}

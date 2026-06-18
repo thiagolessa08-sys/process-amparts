@@ -129,6 +129,14 @@ class VedaraModule(ProcessModule):
         dims = sorted(log["cliente"].dropna().unique().tolist())[:300] if "cliente" in log.columns else []
         labels = {a: _title(a) for a in present}
 
+        case_ts = pd.to_datetime(log[TIMESTAMP]).groupby(log[CASE_ID]).min()
+        dias = sorted({int(t.day) for t in case_ts})
+        if "produto" in log.columns:
+            prods_raw = log["produto"].dropna().replace("—", pd.NA).dropna().unique()
+            produtos = sorted(str(p) for p in prods_raw if str(p).strip())[:300]
+        else:
+            produtos = []
+
         return {
             "key": self.key, "name": self.name, "short": self.short, "color": self.color,
             "totalCases": total_cases, "avgVariants": len(variants),
@@ -146,6 +154,7 @@ class VedaraModule(ProcessModule):
             "filters": {
                 "variantLabel": "Variante", "dimLabel": "Cliente", "dims": dims,
                 "years": period["years"], "months": period["months"],
+                "dias": dias, "produtos": produtos,
             },
         }
 

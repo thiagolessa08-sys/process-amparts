@@ -24,7 +24,7 @@ const SCREENS = [
   { id: "cases", label: "Case Explorer", icon: "search" },
   { id: "assistant", label: "Assistente IA", icon: "bolt" },
 ];
-const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", activity: null };
+const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", dia: "", produto: "", activity: null };
 
 const ACT_MODE_LABEL = { with: "Com", without: "Sem", start: "Inicia em", end: "Termina em" };
 
@@ -77,6 +77,16 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
             </select>
             <span className="caret"><Icon name="chevronD" size={14} /></span>
           </div>
+          {(f.dias?.length > 0) && (
+            <div className="selectwrap">
+              <span className="lead"><Icon name="calendar" size={14} /></span>
+              <select value={filters.dia} onChange={(e) => setFilter({ dia: e.target.value ? Number(e.target.value) : "" })}>
+                <option value="">Dia do Pedido</option>
+                {(f.dias || []).map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <span className="caret"><Icon name="chevronD" size={14} /></span>
+            </div>
+          )}
           <div className="selectwrap supplier">
             <span className="lead"><Icon name="truck" size={14} /></span>
             <select value={fornVal} onChange={(e) => setFilter({ fornecedores: e.target.value ? [e.target.value] : [] })}>
@@ -85,6 +95,16 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
             </select>
             <span className="caret"><Icon name="chevronD" size={14} /></span>
           </div>
+          {(f.produtos?.length > 0) && (
+            <div className="selectwrap supplier">
+              <span className="lead"><Icon name="layers" size={14} /></span>
+              <select value={filters.produto ?? ""} onChange={(e) => setFilter({ produto: e.target.value || "" })}>
+                <option value="">Produto</option>
+                {(f.produtos || []).map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <span className="caret"><Icon name="chevronD" size={14} /></span>
+            </div>
+          )}
         </div>
 
         {filters.activity && (

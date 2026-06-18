@@ -20,6 +20,8 @@ function filterParams(filters = {}) {
   if (filters.endDate)   params.set("end_date",   filters.endDate);
   if (filters.ano)       params.set("ano", filters.ano);
   if (filters.mes)       params.set("mes", filters.mes);
+  if (filters.dia)     params.set("dia",     filters.dia);
+  if (filters.produto) params.set("produto", filters.produto);
   if (filters.activity?.id && filters.activity?.mode) {
     params.set("act_id", filters.activity.id);
     params.set("act_mode", filters.activity.mode);
