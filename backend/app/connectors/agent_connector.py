@@ -38,10 +38,14 @@ class AgentConnector:
                         json={"sql": sql, "limit": limit},
                     )
                     r.raise_for_status()
-                    # O agent rotula como UTF-8, mas o conteúdo é cp1252 (Sybase/Windows):
-                    # decodificar os bytes crus como cp1252 recupera os acentos corretos.
-                    # strict=False: descrições podem conter chars de controle (\n, \t).
-                    text = r.content.decode("cp1252", errors="replace")
+                    # Cordeiro/SAP-B1: agent rotula UTF-8 mas entrega bytes cp1252.
+                    # Vedara/veddara: agent entrega UTF-8 real (tabelas de PM modernas).
+                    # Estratégia: tenta UTF-8 estrito primeiro; se falhar, decodifica
+                    # como cp1252 (Cordeiro). strict=False: controles (\n,\t) em textos.
+                    try:
+                        text = r.content.decode("utf-8")
+                    except UnicodeDecodeError:
+                        text = r.content.decode("cp1252", errors="replace")
                     return json.loads(text, strict=False)
             except _RETRY_EXC as exc:  # noqa: PERF203
                 last = exc

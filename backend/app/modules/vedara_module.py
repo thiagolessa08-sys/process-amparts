@@ -19,6 +19,14 @@ from app.eventlog import CASE_ID, TIMESTAMP
 # caminho feliz (núcleo de conformidade) e cancelamentos (ramos)
 HAPPY = ["CRIAR ORCAMENTO", "CRIAR PEDIDO", "CRIAR FATURA", "BAIXAR FATURA"]
 CANCEL = {"CANCELAR ORCAMENTO", "CANCELAR PEDIDO", "CANCELAR FATURA"}
+REWORK_ACTS = {
+    "ALTERAR PEDIDO",
+    "CANCELAR ORCAMENTO",
+    "CANCELAR PEDIDO",
+    "ALTERAR ORCAMENTO",
+    "CANCELAR FATURA",
+    "PROBLEMAS DE ENTREGA",
+}
 BRANCH_PARENT = {
     "CANCELAR ORCAMENTO": "CRIAR ORCAMENTO",
     "CANCELAR PEDIDO": "CRIAR PEDIDO",
@@ -130,7 +138,8 @@ class VedaraModule(ProcessModule):
             "headlineKpis": self._safe(lambda: _headline(log, total_cases), []),
             "overview": self._safe(lambda: _overview(log), {}),
             "rework": self._safe(
-                lambda: rework(log, "cliente", labels, top=60, also_rework_acts=CANCEL), {}),
+                lambda: rework(log, "cliente", labels, top=60,
+                           also_rework_acts=CANCEL, allowed_acts=REWORK_ACTS), {}),
             "twoMatch": {"monthly": [], "pendentes": []},
             "userProd": self._safe(lambda: user_productivity(log), {}),
             "drill": {},

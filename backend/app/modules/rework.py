@@ -16,10 +16,11 @@ def _case_first(log: pd.DataFrame) -> pd.DataFrame:
 
 
 def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = None,
-           also_rework_acts=None) -> dict:
+           also_rework_acts=None, allowed_acts=None) -> dict:
     """also_rework_acts: atividades que marcam o caso como retrabalho só por
-    estarem presentes, sem precisar repetir (ex.: cancelamentos no O2C, onde
-    cada caso é item-level e atividades não formam loop). Cada ocorrência conta."""
+    estarem presentes, sem precisar repetir (ex.: cancelamentos no O2C).
+    allowed_acts: quando definido, somente estas atividades aparecem no resultado
+    e somente casos com ao menos uma delas são contados como retrabalho."""
     also = set(also_rework_acts or ())
     first = _case_first(log)
     has = lambda c: c in first.columns  # noqa: E731
@@ -43,6 +44,13 @@ def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = N
                 flagged = True
         if flagged:
             rework_cases.add(cid)
+
+    # filtra atividades para o conjunto autorizado (ex.: só cancelamentos + alterações)
+    if allowed_acts is not None:
+        allowed = set(allowed_acts)
+        act_cases = {a: v for a, v in act_cases.items() if a in allowed}
+        act_extra = {a: v for a, v in act_extra.items() if a in allowed}
+        rework_cases = set().union(*act_cases.values()) if act_cases else set()
 
     total = len(seqs)
     itens_by_case = first["itens"] if has("itens") else None
