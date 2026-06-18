@@ -102,45 +102,119 @@ function Bubbles({ users, metric, onSelect }) {
   );
 }
 
-/* ───────── área mensal (eventos do usuário) ───────── */
-function MonthlyArea({ data }) {
+/* ───────── área mensal empilhada por atividade (estilo Celonis) ───────── */
+function MonthlyArea({ data, legend }) {
+  const acts = legend && legend.length ? legend : ["Eventos"];
+  const colorOf = (a) => a === "Outras" ? "#a9a9a9" : DP_COLORS[acts.indexOf(a) % DP_COLORS.length];
+
   const W = 1180, H = 320, padL = 44, padR = 14, padT = 16, padB = 40;
   const cw = W - padL - padR, ch = H - padT - padB;
+  const [hover, setHover] = useState(null);
   if (!data.length) return <div className="up-empty">Sem dados</div>;
+
+  const valOf = (d, a) => d.acts ? (d.acts[a] || 0) : d.events;
   const max = Math.max(5, ...data.map((d) => d.events));
   const xs = (i) => padL + (data.length === 1 ? cw / 2 : (i / (data.length - 1)) * cw);
   const ys = (v) => padT + ch - (v / max) * ch;
-  const line = data.map((d, i) => `${xs(i).toFixed(1)},${ys(d.events).toFixed(1)}`).join(" L ");
-  const area = `M ${padL},${padT + ch} L ${line} L ${padL + cw},${padT + ch} Z`;
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(t * max));
+
+  // áreas empilhadas: para cada atividade, polígono entre acumulado anterior e atual
+  const cum = data.map(() => 0);
+  const bands = acts.map((a) => {
+    const lower = cum.slice();
+    data.forEach((d, i) => { cum[i] += valOf(d, a); });
+    const upper = cum.slice();
+    const top = data.map((_, i) => `${xs(i).toFixed(1)},${ys(upper[i]).toFixed(1)}`).join(" L ");
+    const bot = data.map((_, i) => `${xs(data.length - 1 - i).toFixed(1)},${ys(lower[data.length - 1 - i]).toFixed(1)}`).join(" L ");
+    return { a, d: `M ${top} L ${bot} Z` };
+  });
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg">
-      {ticks.map((t, i) => { const y = ys(t); return <g key={i}><line x1={padL} x2={W - padR} y1={y} y2={y} className="tm-grid" /><text x={padL - 6} y={y + 3} className="tm-axis" textAnchor="end">{t}</text></g>; })}
-      <path d={area} fill="#e6607c" fillOpacity="0.82" />
-      {data.map((d, i) => <circle key={i} cx={xs(i)} cy={ys(d.events)} r="3.5" fill="#f3c14b" stroke="#fff" strokeWidth="1" />)}
-      {data.map((d, i) => (i % 3 === 0 || i === data.length - 1) && <text key={"t" + i} x={xs(i)} y={H - 12} className="tm-axis" textAnchor="middle">{d.mes}</text>)}
-    </svg>
+    <div className="up-dp">
+      <div className="up-dp-legend">
+        {acts.map((a) => <span key={a} className="up-dp-leg"><i style={{ background: colorOf(a) }} />{a}</span>)}
+      </div>
+      <div className="up-dp-chart">
+        <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg">
+          {ticks.map((t, i) => { const y = ys(t); return <g key={i}><line x1={padL} x2={W - padR} y1={y} y2={y} className="tm-grid" /><text x={padL - 6} y={y + 3} className="tm-axis" textAnchor="end">{t}</text></g>; })}
+          {bands.map((b) => <path key={b.a} d={b.d} fill={colorOf(b.a)} fillOpacity="0.88" />)}
+          {data.map((d, i) => (i % 3 === 0 || i === data.length - 1) && <text key={"t" + i} x={xs(i)} y={H - 12} className="tm-axis" textAnchor="middle">{d.mes}</text>)}
+          {data.map((d, i) => {
+            const w = data.length > 1 ? cw / (data.length - 1) : cw;
+            return <rect key={"h" + i} x={xs(i) - w / 2} y={padT} width={w} height={ch} fill="transparent"
+              onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover((p) => p === i ? null : p)} />;
+          })}
+          {hover != null && <line x1={xs(hover)} x2={xs(hover)} y1={padT} y2={padT + ch} className="tm-grid" stroke="#9aa" />}
+        </svg>
+        {hover != null && data[hover] && (
+          <div className="up-dp-tip" style={{ left: `${xs(hover) / W * 100}%` }}>
+            <div className="up-dp-tip-head">{data[hover].mes}</div>
+            {acts.map((a) => { const v = valOf(data[hover], a); return v > 0 && (
+              <div key={a} className="up-dp-tip-row"><i style={{ background: colorOf(a) }} />{a}: <b>{fmtInt(v)}</b></div>
+            ); })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
-/* ───────── perfil diário (barras por faixa de hora) ───────── */
-function DailyProfile({ data }) {
-  const W = 1180, H = 280, padL = 44, padR = 14, padT = 16, padB = 32;
+/* ───────── perfil diário (barras empilhadas por atividade, estilo Celonis) ───────── */
+const DP_COLORS = ["#e6607c", "#c77da6", "#8f8fd0", "#7fc6da", "#6fae87", "#e3b34b", "#a9a9a9"];
+
+function DailyProfile({ data, legend }) {
+  const acts = legend && legend.length ? legend : ["Eventos"];
+  const colorOf = (a) => a === "Outras" ? "#a9a9a9" : DP_COLORS[acts.indexOf(a) % DP_COLORS.length];
+
+  const W = 1180, H = 300, padL = 44, padR = 14, padT = 16, padB = 32;
   const cw = W - padL - padR, ch = H - padT - padB;
   const max = Math.max(1, ...data.map((d) => d.count));
   const n = data.length, group = cw / n, bw = Math.min(54, group * 0.6);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(t * max));
+  const [hover, setHover] = useState(null);
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg">
-      {ticks.map((t, i) => { const y = padT + ch - (t / max) * ch; return <g key={i}><line x1={padL} x2={W - padR} y1={y} y2={y} className="tm-grid" /><text x={padL - 6} y={y + 3} className="tm-axis" textAnchor="end">{t}</text></g>; })}
-      {data.map((d, i) => {
-        const gx = padL + i * group + group / 2, h = (d.count / max) * ch;
-        return <g key={i}>
-          <rect x={gx - bw / 2} y={padT + ch - h} width={bw} height={Math.max(0, h)} rx="2" fill="#e6607c" />
-          <text x={gx} y={H - 10} className="tm-axis" textAnchor="middle">{d.bucket.replace(/:00/g, "").replace(" - ", "–") + "h"}</text>
-        </g>;
-      })}
-    </svg>
+    <div className="up-dp">
+      <div className="up-dp-legend">
+        {acts.map((a) => (
+          <span key={a} className="up-dp-leg"><i style={{ background: colorOf(a) }} />{a}</span>
+        ))}
+      </div>
+      <div className="up-dp-chart">
+        <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg">
+          {ticks.map((t, i) => { const y = padT + ch - (t / max) * ch; return <g key={i}><line x1={padL} x2={W - padR} y1={y} y2={y} className="tm-grid" /><text x={padL - 6} y={y + 3} className="tm-axis" textAnchor="end">{t}</text></g>; })}
+          {data.map((d, i) => {
+            const gx = padL + i * group + group / 2;
+            let yTop = padT + ch;
+            const segs = acts.map((a) => {
+              const v = d.acts ? (d.acts[a] || 0) : d.count;
+              const h = (v / max) * ch;
+              yTop -= h;
+              return { a, v, y: yTop, h };
+            });
+            return <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover((p) => p === i ? null : p)}>
+              {segs.map((s) => s.h > 0 && (
+                <rect key={s.a} x={gx - bw / 2} y={s.y} width={bw} height={Math.max(0, s.h)} fill={colorOf(s.a)} />
+              ))}
+              <text x={gx} y={H - 10} className="tm-axis" textAnchor="middle">{d.bucket.replace(/:00/g, "").replace(" - ", "–") + "h"}</text>
+            </g>;
+          })}
+        </svg>
+        {hover != null && data[hover] && data[hover].count > 0 && (
+          <div className="up-dp-tip" style={{ left: `${(padL + hover * group + group / 2) / W * 100}%` }}>
+            <div className="up-dp-tip-head">Faixa de hora: {data[hover].bucket}</div>
+            {acts.map((a) => {
+              const v = data[hover].acts ? (data[hover].acts[a] || 0) : data[hover].count;
+              return v > 0 && (
+                <div key={a} className="up-dp-tip-row">
+                  <i style={{ background: colorOf(a) }} />{a}: <b>{fmtInt(v)}</b>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -185,12 +259,12 @@ function UserDrill({ moduleKey, name, filters, onBack }) {
 
           <div className="panel">
             <div className="panel-head"><span className="pt"><b>{name}</b> — atividades por mês</span></div>
-            <div className="panel-body"><MonthlyArea data={d.monthly} /></div>
+            <div className="panel-body"><MonthlyArea data={d.monthly} legend={d.dailyLegend} /></div>
           </div>
 
           <div className="panel">
             <div className="panel-head"><span className="pt"><b>{name}</b> — perfil diário</span></div>
-            <div className="panel-body"><DailyProfile data={d.dailyProfile} /></div>
+            <div className="panel-body"><DailyProfile data={d.dailyProfile} legend={d.dailyLegend} /></div>
           </div>
         </>
       )}

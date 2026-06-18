@@ -95,14 +95,30 @@ def user_detail(log: pd.DataFrame, name: str) -> dict:
     pc = round(100 * tc.sum() / len(come)) if len(come) else 0
     pg = round(100 * tg.sum() / len(goes)) if len(goes) else 0
 
-    monthly = [
-        {"mes": m, "events": int(c)}
-        for m, c in u.assign(_m=u[TIMESTAMP].dt.strftime("%Y-%m")).groupby("_m").size().sort_index().items()
-    ]
+    # legenda compartilhada (top N atividades do usuário + "Outras")
+    top_acts = list(u[ACTIVITY].value_counts().head(6).index)
+    ua = u.assign(_a=u[ACTIVITY].where(u[ACTIVITY].isin(top_acts), "Outras"))
+    has_other = (ua["_a"] == "Outras").any()
+    legend = [str(a) for a in top_acts] + (["Outras"] if has_other else [])
 
+    # série mensal empilhada por atividade (estilo Celonis)
+    mp = (ua.assign(_m=u[TIMESTAMP].dt.strftime("%Y-%m"))
+            .groupby(["_m", "_a"]).size().unstack(fill_value=0))
+    monthly = []
+    for m in mp.index:
+        row = mp.loc[m]
+        acts = {a: int(row.get(a, 0)) for a in legend}
+        monthly.append({"mes": m, "events": int(sum(acts.values())), "acts": acts})
+
+    # perfil diário empilhado por atividade (estilo Celonis): top N atividades
+    # + "Outras", com contagem por faixa de 2h.
     bi = (u[TIMESTAMP].dt.hour // 2).clip(0, 11)
-    counts = bi.value_counts()
-    daily = [{"bucket": _BUCKETS[i], "count": int(counts.get(i, 0))} for i in range(12)]
+    pivot = ua.assign(_bucket=bi).groupby(["_bucket", "_a"]).size().unstack(fill_value=0)
+    daily = []
+    for i in range(12):
+        row = pivot.loc[i] if i in pivot.index else None
+        acts = {a: (int(row.get(a, 0)) if row is not None else 0) for a in legend}
+        daily.append({"bucket": _BUCKETS[i], "count": int(sum(acts.values())), "acts": acts})
 
     return {
         "user": name, "found": True,
@@ -115,4 +131,5 @@ def user_detail(log: pd.DataFrame, name: str) -> dict:
         "goesTo": {"names": [str(x) for x in tg.index], "pct": pg},
         "monthly": monthly,
         "dailyProfile": daily,
+        "dailyLegend": legend,
     }
