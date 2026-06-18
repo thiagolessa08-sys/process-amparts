@@ -22,6 +22,10 @@ function filterParams(filters = {}) {
   if (filters.mes)       params.set("mes", filters.mes);
   if (filters.dia)     params.set("dia",     filters.dia);
   if (filters.produto) params.set("produto", filters.produto);
+  if (filters.variantKeys?.length) {
+    filters.variantKeys.forEach((k) => params.append("variant", k));
+    params.set("variant_mode", filters.variantMode || "include");
+  }
   if (filters.activity?.id && filters.activity?.mode) {
     params.set("act_id", filters.activity.id);
     params.set("act_mode", filters.activity.mode);

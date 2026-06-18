@@ -1,3 +1,4 @@
+import hashlib
 import os
 from pathlib import Path
 from typing import Optional
@@ -99,6 +100,33 @@ def _apply_filters(
         log = log[log[CASE_ID].isin(valid_cases)]
 
     return log
+
+
+def _seq_key(activities: list[str]) -> str:
+    """Assinatura curta e estável de uma sequência de atividades (variante).
+    Independe da numeração posicional (v1, v2…): identifica pela sequência em si."""
+    raw = "".join(str(a) for a in activities)
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+
+
+def _apply_variant_filter(log: pd.DataFrame, module, keys: list[str], mode: str) -> pd.DataFrame:
+    """Filtra os casos pela variante (sequência de atividades), como o Celonis:
+    mode 'include' mantém só os casos das variantes selecionadas; 'exclude' remove.
+    A sequência é remapeada pelo activity_map do módulo (mesma base do discover_variants)."""
+    if not keys:
+        return log
+    wanted = set(keys)
+    amap = getattr(module, "activity_map", {}) or {}
+    tmp = log.copy()
+    acts = tmp[ACTIVITY].astype(str)
+    tmp[ACTIVITY] = acts.map(amap).fillna(acts)
+    tmp[TIMESTAMP] = pd.to_datetime(tmp[TIMESTAMP])
+    seqs = (tmp.sort_values([CASE_ID, TIMESTAMP])
+               .groupby(CASE_ID, sort=False)[ACTIVITY].agg(tuple))
+    case_key = seqs.map(lambda t: _seq_key(list(t)))
+    hit = case_key.isin(wanted)
+    keep = case_key.index[~hit if mode == "exclude" else hit]
+    return log[log[CASE_ID].isin(keep)]
 
 
 def _apply_activity_filter(log: pd.DataFrame, module, act_id, act_mode) -> pd.DataFrame:
@@ -291,21 +319,29 @@ def get_module(
     produto: Optional[str] = Query(default=None),
     act_id: Optional[str] = Query(default=None),
     act_mode: Optional[str] = Query(default=None),
+    variant: list[str] = Query(default=[]),
+    variant_mode: str = Query(default="include"),
 ):
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
     _guard_cordeiro(key)
-    ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, dia, produto, act_id, act_mode)
+    ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, dia, produto,
+          act_id, act_mode, tuple(sorted(variant)), variant_mode)
     cached = _ENRICH_CACHE.get(ck)
     if cached is not None:
         return cached
     log = data_source.get_log(module_key=key)
     log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto)
     log = _apply_activity_filter(log, module, act_id, act_mode)
+    log = _apply_variant_filter(log, module, variant, variant_mode)
     if log.empty or log[CASE_ID].nunique() == 0:
         raise HTTPException(status_code=422, detail="Nenhum caso encontrado para os filtros aplicados")
     payload = module.enrich(log)
+    # chave de variante (assinatura da sequência) p/ o front filtrar pela seleção
+    for v in payload.get("variants", []):
+        path = v.get("path") or []
+        v["key"] = _seq_key(path[1:-1])
     if len(_ENRICH_CACHE) > 64:
         _ENRICH_CACHE.clear()
     _ENRICH_CACHE[ck] = payload
@@ -324,6 +360,8 @@ def get_cases(
     produto: Optional[str] = Query(default=None),
     act_id: Optional[str] = Query(default=None),
     act_mode: Optional[str] = Query(default=None),
+    variant: list[str] = Query(default=[]),
+    variant_mode: str = Query(default="include"),
     q: Optional[str] = Query(default=None),
     limit: int = Query(default=500),
 ):
@@ -334,12 +372,14 @@ def get_cases(
 
     # índice (ordenar+resumir) é caro → cacheado por assinatura de filtro.
     # A busca por Case Id (q) e a página (limit) ficam fora da chave: rodam barato.
-    sig = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, dia, produto, act_id, act_mode)
+    sig = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, dia, produto,
+           act_id, act_mode, tuple(sorted(variant)), variant_mode)
     idx = _CASES_CACHE.get(sig)
     if idx is None:
         log = data_source.get_log(module_key=key)
         log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto)
         log = _apply_activity_filter(log, module, act_id, act_mode)
+        log = _apply_variant_filter(log, module, variant, variant_mode)
         if log.empty or log[CASE_ID].nunique() == 0:
             return {"cases": [], "total": 0}
         idx = build_case_index(log)

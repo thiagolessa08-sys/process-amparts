@@ -440,6 +440,15 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
   const dragRef = useRef(null);
   const [showFilters, setShowFilters] = useState(false);
   const [popover, setPopover] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [menuOpen]);
 
   function onPointerDown(e) {
     // não inicia pan ao clicar nos controles, no popover ou numa caixa de etapa
@@ -510,12 +519,22 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
       : new Set(data.variants.map((v) => v.id)));   // selecionar todas
   }
 
+  // filtro global de variante (igual ao Celonis): mantém só / exclui os casos
+  // das variantes marcadas. Identifica pela assinatura da sequência (v.key).
+  function applyVariantFilter(mode) {
+    setMenuOpen(false);
+    const keys = data.variants.filter((v) => selectedIds.has(v.id)).map((v) => v.key).filter(Boolean);
+    if (!keys.length) return;
+    onFiltersChange({ ...filters, variantKeys: keys, variantMode: mode });
+  }
+
   function toggleForn(d) {
     const next = localForn.includes(d) ? localForn.filter((x) => x !== d) : [...localForn, d];
-    setLocalForn(next); onFiltersChange({ fornecedores: next, startDate, endDate });
+    setLocalForn(next); onFiltersChange({ ...filters, fornecedores: next, startDate, endDate });
   }
   function handleDate(field, value) {
-    const next = field === "start" ? { fornecedores: localForn, startDate: value, endDate } : { fornecedores: localForn, startDate, endDate: value };
+    const dates = field === "start" ? { startDate: value, endDate } : { startDate, endDate: value };
+    const next = { ...filters, fornecedores: localForn, ...dates };
     if (field === "start") setStartDate(value); else setEndDate(value);
     if ((next.startDate && next.endDate) || (!next.startDate && !next.endDate)) onFiltersChange(next);
   }
@@ -537,10 +556,30 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
           </div>
         </div>
 
-        <button className="filter" onClick={() => setShowFilters((s) => !s)}>
-          <Icon name="filter" size={15} /> Aplicar filtro
-          <span className="chev" style={{ marginLeft: "auto", transform: showFilters ? "rotate(90deg)" : "none", transition: "transform .15s" }}><Icon name="chevronR" size={15} /></span>
-        </button>
+        <div className="vfilter" ref={menuRef}>
+          <button className="filter" onClick={() => setMenuOpen((s) => !s)}>
+            <Icon name="filter" size={15} /> Aplicar filtro
+            <span className="chev" style={{ marginLeft: "auto", transform: menuOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }}><Icon name="chevronD" size={15} /></span>
+          </button>
+          {menuOpen && (
+            <div className="vfilter-menu">
+              <div className="vfilter-cap">Variantes selecionadas · {selectedIds.size}</div>
+              <button className="np-opt" onClick={() => applyVariantFilter("include")}>
+                <span className="np-opt-l"><Icon name="filter" size={13} /> Filtrar pelos selecionados</span>
+                <span className="np-opt-r mono">{selectedIds.size}</span>
+              </button>
+              <button className="np-opt" onClick={() => applyVariantFilter("exclude")}>
+                <span className="np-opt-l"><Icon name="close" size={13} /> Excluir selecionados</span>
+                <span className="np-opt-r mono">{selectedIds.size}</span>
+              </button>
+              <div className="vfilter-div" />
+              <button className="np-opt" onClick={() => { setShowFilters((s) => !s); setMenuOpen(false); }}>
+                <span className="np-opt-l"><Icon name="calendar" size={13} /> Período e dimensão</span>
+                <span className="np-opt-r"><Icon name="chevronR" size={13} /></span>
+              </button>
+            </div>
+          )}
+        </div>
 
         {showFilters && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

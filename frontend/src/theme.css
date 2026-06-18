@@ -869,6 +869,23 @@
   .filter svg { width: 15px; height: 15px; color: var(--muted); }
   .filter .chev { margin-left: auto; }
 
+  /* dropdown "Aplicar filtro" (filtro de variante, estilo Celonis) */
+  .vfilter { position: relative; }
+  .vfilter-menu {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 13px;
+    box-shadow: var(--shadow-pop); padding: 8px; display: flex; flex-direction: column; gap: 5px;
+    animation: npIn .14s ease;
+  }
+  .vfilter-cap {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+    color: var(--faint); padding: 3px 6px 4px;
+  }
+  .vfilter-div { height: 1px; background: var(--line-2); margin: 3px 2px; }
+  .np-opt-l { display: inline-flex; align-items: center; gap: 8px; }
+  .np-opt-l svg { width: 13px; height: 13px; color: var(--muted); }
+  .np-opt.on .np-opt-l svg { color: rgba(255,255,255,.9); }
+
   /* variant table */
   .vt-head {
     display: grid;

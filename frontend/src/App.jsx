@@ -24,7 +24,7 @@ const SCREENS = [
   { id: "cases", label: "Case Explorer", icon: "search" },
   { id: "assistant", label: "Assistente IA", icon: "bolt" },
 ];
-const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", dia: "", produto: "", activity: null };
+const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", dia: "", produto: "", activity: null, variantKeys: [], variantMode: "include" };
 
 const ACT_MODE_LABEL = { with: "Com", without: "Sem", start: "Inicia em", end: "Termina em" };
 
@@ -111,6 +111,13 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
           <button className="act-chip" onClick={() => setFilter({ activity: null })} title="Remover filtro de atividade">
             <Icon name="filter" size={13} />
             {ACT_MODE_LABEL[filters.activity.mode]}: <b>{filters.activity.label}</b>
+            <Icon name="close" size={13} />
+          </button>
+        )}
+        {filters.variantKeys?.length > 0 && (
+          <button className="act-chip" onClick={() => setFilter({ variantKeys: [], variantMode: "include" })} title="Remover filtro de variante">
+            <Icon name="variants" size={13} />
+            {filters.variantMode === "exclude" ? "Variantes excluídas" : "Filtrado por variante"}: <b>{filters.variantKeys.length}</b>
             <Icon name="close" size={13} />
           </button>
         )}
