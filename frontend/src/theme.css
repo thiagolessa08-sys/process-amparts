@@ -426,12 +426,14 @@
 
   /* dot plot — TOP Produtos */
   .dotplot { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-  .dprow { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 10px; height: 26px; }
+  .dprow { display: flex; flex-direction: column; gap: 4px; padding: 7px 0; border-bottom: 1px solid var(--line-2); }
+  .dprow:last-child { border-bottom: none; }
   .dprow .dpl {
-    font-family: "JetBrains Mono", monospace; font-size: 11.5px; font-weight: 500;
-    color: var(--ink-2); text-align: right; white-space: nowrap;
+    font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500;
+    color: var(--ink-2); line-height: 1.35; word-break: break-word;
   }
-  .dptrack { position: relative; height: 100%; border-left: 1px dashed var(--line); }
+  .dpbar { display: grid; grid-template-columns: 1fr 56px; align-items: center; gap: 10px; }
+  .dptrack { position: relative; height: 16px; border-left: 1px dashed var(--line); }
   .dptrack::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dotted var(--line-2); }
   .dpdot {
     position: absolute; top: 50%; transform: translate(-50%, -50%);
@@ -442,7 +444,11 @@
     cursor: pointer; transition: transform .12s ease;
   }
   .dpdot:hover { transform: translate(-50%, -50%) scale(1.25); }
-  .dpaxis { display: grid; grid-template-columns: 84px 1fr; gap: 10px; margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); }
+  .dpv {
+    font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600;
+    color: var(--ink-2); text-align: right;
+  }
+  .dpaxis { display: grid; grid-template-columns: 1fr 56px; gap: 10px; margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); }
   .dpticks { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); font-family: "JetBrains Mono", monospace; }
 
   /* horizontal bars — Cancelados por Mês */

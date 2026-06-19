@@ -57,15 +57,17 @@ function ProdutosPanel({ rows = [] }) {
         <div className="dotplot">
           {rows.map((r) => (
             <div className="dprow" key={r.produto}>
-              <div className="dpl">{r.produto}</div>
-              <div className="dptrack">
-                <span className="dpdot" style={{ left: (r.itens / max) * 100 + "%" }} title={`${r.produto}: ${fmtInt(r.itens)} itens`} />
+              <div className="dpl" title={r.produto}>{r.produto}</div>
+              <div className="dpbar">
+                <div className="dptrack">
+                  <span className="dpdot" style={{ left: (r.itens / max) * 100 + "%" }} title={`${r.produto}: ${fmtInt(r.itens)} itens`} />
+                </div>
+                <div className="dpv">{fmtInt(r.itens)}</div>
               </div>
             </div>
           ))}
         </div>
         <div className="dpaxis">
-          <span />
           <div className="dpticks">{ticks.map((t, i) => <span key={i}>{t}</span>)}</div>
         </div>
       </div>
