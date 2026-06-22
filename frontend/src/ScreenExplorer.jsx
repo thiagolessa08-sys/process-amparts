@@ -87,18 +87,49 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
   const [branchLines, setBranchLines] = useState([]);
   const [trace, setTrace] = useState(null);
 
+  // ramos laterais presentes no grafo, agrupados pelo nó-pai da espinha
+  const branchMap = BRANCH_BY_MODULE[moduleKey] || graphData.branchMap || {};
+
   const primary = useMemo(() => {
     // ordem da espinha: hardcoded por módulo, ou vinda do payload (módulos data-driven)
     const order   = IDEAL_BY_MODULE[moduleKey] || graphData.idealOrder || IDEAL_BY_MODULE.p2p;
     const present = new Set(graphData.nodes.map((n) => n.id));
-    return order.filter((id) => present.has(id));
-  }, [graphData, moduleKey]);
+    const spine   = order.filter((id) => present.has(id));
+
+    // ramos (ex.: cancelamentos) que TÊM o nó-pai presente continuam como ramos laterais
+    const attachable = new Set(
+      graphData.nodes.filter((n) => branchMap[n.id] && present.has(branchMap[n.id])).map((n) => n.id)
+    );
+
+    // nós presentes (não-terminais) que não estão na espinha e não viram ramo (pai ausente)
+    // ficariam INVISÍVEIS — ex.: "CANCELAR PEDIDO" numa variante sem "CRIAR PEDIDO".
+    // Promove cada um para a espinha, logo após seu antecessor real no subgrafo.
+    const placed = spine.slice();
+    let orphans = graphData.nodes
+      .filter((n) => !n.type && !placed.includes(n.id) && !attachable.has(n.id))
+      .map((n) => n.id);
+    let guard = orphans.length + 1;
+    while (orphans.length && guard-- > 0) {
+      const rest = [];
+      for (const id of orphans) {
+        let predIdx = null;  // -1 = entra logo após o INÍCIO (topo da espinha)
+        for (const e of graphData.edges) {
+          if (e.to !== id) continue;
+          if (e.from === "start") { predIdx = Math.max(predIdx ?? -1, -1); continue; }
+          const k = placed.indexOf(e.from);
+          if (k >= 0) predIdx = Math.max(predIdx ?? -1, k);
+        }
+        if (predIdx !== null) { placed.splice(predIdx + 1, 0, id); }
+        else rest.push(id);
+      }
+      if (rest.length === orphans.length) { placed.push(...rest); break; }  // sem progresso
+      orphans = rest;
+    }
+    return placed;
+  }, [graphData, moduleKey, branchMap]);
 
   const nodeById = useMemo(() => Object.fromEntries(graphData.nodes.map((n) => [n.id, n])), [graphData]);
   const edgeById = useMemo(() => Object.fromEntries(graphData.edges.map((e) => [e.id, e])), [graphData]);
-
-  // ramos laterais presentes no grafo, agrupados pelo nó-pai da espinha
-  const branchMap = BRANCH_BY_MODULE[moduleKey] || graphData.branchMap || {};
   const branchesByParent = useMemo(() => {
     const present = new Set(primary);
     const out = {};
