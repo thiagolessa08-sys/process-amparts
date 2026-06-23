@@ -36,7 +36,7 @@ ALLOWED_ORIGINS = os.environ.get(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.railway\.app",
+    allow_origin_regex=r"https://(.*\.railway\.app|(.*\.)?ma3processmining\.com\.br)",
     allow_methods=["*"],
     allow_headers=["*"],
 )
