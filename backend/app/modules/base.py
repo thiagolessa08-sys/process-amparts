@@ -33,6 +33,10 @@ class ProcessModule(ABC):
     # mapa nome-cru -> id-canônico (sobrescrito pelos módulos)
     activity_map: dict = {}
 
+    # nome-cru da atividade que define a "data do pedido" para o filtro de
+    # período. Se None, o filtro usa o 1º evento do caso (case start).
+    order_activity: str | None = None
+
     def raw_activities(self, canonical: str) -> list[str]:
         """Nomes crus do event log que correspondem a um id canônico."""
         raws = [raw for raw, canon in self.activity_map.items() if canon == canonical]

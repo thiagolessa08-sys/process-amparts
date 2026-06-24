@@ -61,8 +61,15 @@ def _apply_filters(
     mes: Optional[int] = None,
     dia: Optional[int] = None,
     produto: Optional[str] = None,
+    order_activity: Optional[str] = None,
 ) -> pd.DataFrame:
-    """Filtra o event log por fornecedor/cliente, período, dia e/ou produto."""
+    """Filtra o event log por fornecedor/cliente, período, dia e/ou produto.
+
+    A data de referência de cada caso para os filtros de período é o 1º evento
+    (case start), salvo se `order_activity` for informado: nesse caso usa a data
+    desse evento (a "data do pedido"), e casos sem esse evento ficam de fora dos
+    resultados quando há filtro de período.
+    """
     if fornecedores:
         dim = "fornecedor" if "fornecedor" in log.columns else (
             "cliente" if "cliente" in log.columns else None)
@@ -73,11 +80,12 @@ def _apply_filters(
         cases_with = log[log["produto"] == produto][CASE_ID].unique()
         log = log[log[CASE_ID].isin(cases_with)]
 
-    if ano or mes or dia:
-        # filtra pelo ano/mês/dia do primeiro evento do caso (data do pedido)
+    if ano or mes or dia or start_date or end_date:
         log[TIMESTAMP] = pd.to_datetime(log[TIMESTAMP])
-        case_start = log.groupby(CASE_ID)[TIMESTAMP].min()
-        valid = case_start
+        ref = _case_ref_date(log, order_activity)
+
+    if ano or mes or dia:
+        valid = ref
         if ano:
             valid = valid[valid.dt.year == ano]
         if mes:
@@ -87,19 +95,24 @@ def _apply_filters(
         log = log[log[CASE_ID].isin(valid.index)]
 
     if start_date or end_date:
-        # filtra pelo timestamp do primeiro evento do caso (case start date)
-        log[TIMESTAMP] = pd.to_datetime(log[TIMESTAMP])
-        case_start = log.groupby(CASE_ID)[TIMESTAMP].min()
-        valid_cases = case_start.index
+        valid = ref
         if start_date:
-            valid_cases = case_start[case_start >= pd.Timestamp(start_date)].index
+            valid = valid[valid >= pd.Timestamp(start_date)]
         if end_date:
-            valid_cases = case_start.loc[valid_cases][
-                case_start.loc[valid_cases] <= pd.Timestamp(end_date)
-            ].index
-        log = log[log[CASE_ID].isin(valid_cases)]
+            valid = valid[valid <= pd.Timestamp(end_date)]
+        log = log[log[CASE_ID].isin(valid.index)]
 
     return log
+
+
+def _case_ref_date(log: pd.DataFrame, order_activity: Optional[str]) -> pd.Series:
+    """Data de referência por caso: data do evento de pedido (se `order_activity`
+    informado e presente) ou o 1º evento do caso (case start)."""
+    if order_activity:
+        ped = log[log["activity"] == order_activity]
+        if not ped.empty:
+            return ped.groupby(CASE_ID)[TIMESTAMP].min()
+    return log.groupby(CASE_ID)[TIMESTAMP].min()
 
 
 def _seq_key(activities: list[str]) -> str:
@@ -332,7 +345,8 @@ def get_module(
     if cached is not None:
         return cached
     log = data_source.get_log(module_key=key)
-    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto)
+    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto,
+                         order_activity=module.order_activity)
     log = _apply_activity_filter(log, module, act_id, act_mode)
     log = _apply_variant_filter(log, module, variant, variant_mode)
     if log.empty or log[CASE_ID].nunique() == 0:
@@ -377,7 +391,8 @@ def get_cases(
     idx = _CASES_CACHE.get(sig)
     if idx is None:
         log = data_source.get_log(module_key=key)
-        log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto)
+        log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto,
+                             order_activity=module.order_activity)
         log = _apply_activity_filter(log, module, act_id, act_mode)
         log = _apply_variant_filter(log, module, variant, variant_mode)
         if log.empty or log[CASE_ID].nunique() == 0:
@@ -421,7 +436,8 @@ def ask_module(
         raise HTTPException(status_code=400, detail="Pergunta vazia")
 
     log = data_source.get_log(module_key=key)
-    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
+    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes,
+                         order_activity=module.order_activity)
     if log.empty:
         raise HTTPException(status_code=422, detail="Nenhum caso para os filtros aplicados")
 
@@ -450,7 +466,8 @@ def get_user(
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
     log = data_source.get_log(module_key=key)
-    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes)
+    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes,
+                         order_activity=module.order_activity)
     log = _apply_activity_filter(log, module, act_id, act_mode)
     return user_detail(log, name)
 

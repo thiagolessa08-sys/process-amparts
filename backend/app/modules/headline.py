@@ -62,13 +62,24 @@ def headline_kpis(log: pd.DataFrame, total_cases: int) -> list[dict]:
     ]
 
 
-def period_filters(log: pd.DataFrame) -> dict:
-    """Anos e meses disponíveis, com base na data de início de cada caso."""
-    df = log[[CASE_ID, TIMESTAMP]].copy()
+def case_ref_date(log: pd.DataFrame, order_activity: str | None = None):
+    """Data de referência por caso: data do evento de pedido (se `order_activity`
+    informado e presente) ou o 1º evento do caso (case start)."""
+    df = log[[CASE_ID, TIMESTAMP, "activity"]].copy() if order_activity else log[[CASE_ID, TIMESTAMP]].copy()
     df[TIMESTAMP] = pd.to_datetime(df[TIMESTAMP])
-    case_start = df.groupby(CASE_ID)[TIMESTAMP].min()
-    years = sorted({int(d.year) for d in case_start})
-    months = sorted({int(d.month) for d in case_start})
+    if order_activity:
+        ped = df[df["activity"] == order_activity]
+        if not ped.empty:
+            return ped.groupby(CASE_ID)[TIMESTAMP].min()
+    return df.groupby(CASE_ID)[TIMESTAMP].min()
+
+
+def period_filters(log: pd.DataFrame, order_activity: str | None = None) -> dict:
+    """Anos e meses disponíveis, pela data de referência de cada caso (data do
+    pedido se `order_activity` informado; senão, o 1º evento)."""
+    ref = case_ref_date(log, order_activity)
+    years = sorted({int(d.year) for d in ref})
+    months = sorted({int(d.month) for d in ref})
     return {
         "years": years,
         "months": [{"value": m, "label": _MONTHS_PT[m - 1]} for m in months],

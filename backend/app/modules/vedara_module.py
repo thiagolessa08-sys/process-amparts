@@ -11,7 +11,7 @@ from app.modules.base import ProcessModule
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.activity_stats import activity_metrics
-from app.modules.headline import _fmt_compact, _spark, period_filters
+from app.modules.headline import _fmt_compact, _spark, period_filters, case_ref_date
 from app.modules.rework import rework
 from app.modules.userprod import user_productivity
 from app.eventlog import CASE_ID, TIMESTAMP
@@ -52,6 +52,7 @@ class VedaraModule(ProcessModule):
     color = "#0e9f93"
     ideal_path = HAPPY
     activity_map: dict = {}  # identidade: a atividade já é o id
+    order_activity = PED      # filtro de período usa a data do pedido
 
     def enrich(self, log: pd.DataFrame) -> dict:
         log = log.copy()
@@ -124,11 +125,12 @@ class VedaraModule(ProcessModule):
             })
 
         kpis   = self._kpis(log, total_cases, variants)
-        period = period_filters(log)
+        period = period_filters(log, order_activity=self.order_activity)
         dims = sorted(log["cliente"].dropna().unique().tolist())[:300] if "cliente" in log.columns else []
         labels = {a: _title(a) for a in present}
 
-        case_ts = pd.to_datetime(log[TIMESTAMP]).groupby(log[CASE_ID]).min()
+        # dias disponíveis pela data do pedido (consistente com o filtro de período)
+        case_ts = case_ref_date(log, self.order_activity)
         dias = sorted({int(t.day) for t in case_ts})
         if "produto" in log.columns:
             prods_raw = log["produto"].dropna().replace("—", pd.NA).dropna().unique()
