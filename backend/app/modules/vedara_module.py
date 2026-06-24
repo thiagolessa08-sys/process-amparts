@@ -17,22 +17,21 @@ from app.modules.userprod import user_productivity
 from app.eventlog import CASE_ID, TIMESTAMP
 
 # caminho feliz (núcleo de conformidade) e cancelamentos (ramos)
-HAPPY = ["CRIAR ORCAMENTO", "CRIAR PEDIDO", "CRIAR FATURA", "BAIXAR FATURA"]
-CANCEL = {"CANCELAR ORCAMENTO", "CANCELAR PEDIDO", "CANCELAR FATURA"}
+HAPPY = ["CRIACAO DO ORCAMENTO", "CRIACAO DO PEDIDO", "CRIACAO DA FATURA"]
+CANCEL = {"CANCELAMENTO DO ORCAMENTO", "CANCELAMENTO DO PEDIDO", "CANCELAMENTO DA FATURA"}
 REWORK_ACTS = {
-    "ALTERAR PEDIDO",
-    "CANCELAR ORCAMENTO",
-    "CANCELAR PEDIDO",
-    "ALTERAR ORCAMENTO",
-    "CANCELAR FATURA",
-    "PROBLEMAS DE ENTREGA",
+    "ALTERACAO DO PEDIDO",
+    "CANCELAMENTO DO ORCAMENTO",
+    "CANCELAMENTO DO PEDIDO",
+    "ALTERACAO DO ORCAMENTO",
+    "CANCELAMENTO DA FATURA",
 }
 BRANCH_PARENT = {
-    "CANCELAR ORCAMENTO": "CRIAR ORCAMENTO",
-    "CANCELAR PEDIDO": "CRIAR PEDIDO",
-    "CANCELAR FATURA": "CRIAR FATURA",
+    "CANCELAMENTO DO ORCAMENTO": "CRIACAO DO ORCAMENTO",
+    "CANCELAMENTO DO PEDIDO": "CRIACAO DO PEDIDO",
+    "CANCELAMENTO DA FATURA": "CRIACAO DA FATURA",
 }
-PED, FAT = "CRIAR PEDIDO", "CRIAR FATURA"
+PED, FAT = "CRIACAO DO PEDIDO", "CRIACAO DA FATURA"
 START, END = "start", "end"
 
 
@@ -230,7 +229,7 @@ def _overview(log):
         out["topProdutos"] = [{"produto": str(p), "itens": int(n)}
                               for p, n in cp.value_counts().head(10).items()]
 
-    cancp = log[log["activity"] == "CANCELAR PEDIDO"]
+    cancp = log[log["activity"] == "CANCELAMENTO DO PEDIDO"]
     if not cancp.empty:
         mes = cancp[TIMESTAMP].dt.strftime("%Y-%m")
         out["canceladosPorMes"] = [{"mes": m, "count": int(c)}
