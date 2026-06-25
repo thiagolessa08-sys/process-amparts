@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { Icon } from "./icons.jsx";
 import { Graph, buildSubgraph, defaultSelection } from "./ScreenExplorer.jsx";
 
@@ -131,16 +132,51 @@ function PorClientePanel({ rows = [], dim }) {
   );
 }
 
+const RWK_ZOOM0 = 0.74;
+
 export function ReworkScreen({ data }) {
   const rw = data.rework || {};
   const dim = data.filters?.dimLabel || data.dimension || "Cliente";
   const graphData = buildSubgraph(data, defaultSelection(data.variants));
+
+  const [zoom, setZoom] = useState(RWK_ZOOM0);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef(null);
+  const onPointerDown = (e) => {
+    if (e.target.closest("button, .zoom, .legend, .node, .node-pop")) return;
+    setDragging(true);
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: pan.x, oy: pan.y };
+  };
+  const onPointerMove = (e) => {
+    if (!dragRef.current) return;
+    setPan({ x: dragRef.current.ox + (e.clientX - dragRef.current.sx), y: dragRef.current.oy + (e.clientY - dragRef.current.sy) });
+  };
+  const onPointerUp = () => { dragRef.current = null; setDragging(false); };
+  const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(RWK_ZOOM0); };
+
   return (
     <div className="rework">
       <div className="rwk-flow">
-        <div className="rwk-graph-scroll">
-          <Graph graphData={graphData} mode="contagem" zoom={0.74} pan={{ x: 0, y: 0 }}
-            dragging={false} animKey="rwk" moduleKey={data.key} playingVariant={null} replayKey={0} />
+        <div className="viewport" style={{ cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}
+          onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
+          <Graph graphData={graphData} mode="contagem" zoom={zoom} pan={pan} dragging={dragging}
+            animKey="rwk" moduleKey={data.key} playingVariant={null} replayKey={0} />
+        </div>
+        <div className="legend">
+          <div className="ttl">Frequência</div>
+          <div className="grad" />
+          <div className="scale"><span>baixa</span><span>alta</span></div>
+          <div className="gargalo"><i />Gargalo / desvio</div>
+        </div>
+        <div className="zoom">
+          <div className="zoom-stack">
+            <button onClick={() => setZoom((z) => Math.min(1.8, +(z + 0.12).toFixed(2)))}><Icon name="plus" size={16} /></button>
+            <button onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.12).toFixed(2)))}><Icon name="minus" size={16} /></button>
+            <button onClick={resetView}><Icon name="fit" size={16} /></button>
+          </div>
+          <div className="zoom-pct mono">{Math.round(zoom * 100)}%</div>
         </div>
       </div>
       <div className="rwk-col">

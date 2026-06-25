@@ -531,7 +531,7 @@
   }
   .rwk-flow {
     position: relative;
-    overflow: auto;
+    overflow: hidden;
     background: var(--canvas-bg);
     background-image: radial-gradient(circle, var(--dot) 1.1px, transparent 1.1px);
     background-size: 24px 24px;
