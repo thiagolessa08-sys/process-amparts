@@ -35,7 +35,8 @@ def load_vedara_eventlog(conn: AgentConnector | None = None, progress=None) -> p
 
     acts = conn.paginate_offset(
         "_CASE_KEY_O2C, ACTIVITY_EN, EVENTTIME, SORTING, USUARIO, VENDEDOR, "
-        "CLIENTE, PRODUTO, PROD_NOME",
+        "CLIENTE, PRODUTO, PROD_NOME, ORCAMENTO, ORC_ITEM, PEDIDO, PED_ITEM, "
+        "FATURA, FAT_ITEM, SOURCE_ACTIVITY, OLD_VALUE_CHANGED, NEW_VALUE_CHANGED",
         ACT_TABLE, order="_CASE_KEY_O2C, SORTING, EVENTTIME",
         where=f"EVENTTIME >= '{DESDE}'",
         on_rows=lambda n: progress(3 + 80 * min(n, total) / total))
@@ -50,6 +51,9 @@ def load_vedara_eventlog(conn: AgentConnector | None = None, progress=None) -> p
     produto = acts["PROD_NOME"].where(acts["PROD_NOME"].notna() & (acts["PROD_NOME"].astype(str) != ""),
                                       acts["PRODUTO"])
 
+    def _txt(col):
+        return acts[col].astype(str).where(acts[col].notna(), None) if col in acts else None
+
     log = pd.DataFrame({
         "case_id": acts["_CASE_KEY_O2C"].astype(str),
         "activity": acts["ACTIVITY_EN"].astype(str).str.strip(),
@@ -60,6 +64,19 @@ def load_vedara_eventlog(conn: AgentConnector | None = None, progress=None) -> p
         "vendedor": acts["VENDEDOR"].fillna("—"),
         "cliente": acts["CLIENTE"].fillna("—"),
         "produto": produto.fillna("—"),
+        # atributos crus do evento (painel de detalhe no Case Explorer)
+        "eventtime_raw": eventtime,
+        "produto_cod": _txt("PRODUTO"),
+        "prod_nome": _txt("PROD_NOME"),
+        "orcamento": _txt("ORCAMENTO"),
+        "orc_item": _txt("ORC_ITEM"),
+        "pedido": _txt("PEDIDO"),
+        "ped_item": _txt("PED_ITEM"),
+        "fatura": _txt("FATURA"),
+        "fat_item": _txt("FAT_ITEM"),
+        "source_activity": _txt("SOURCE_ACTIVITY"),
+        "old_value_changed": _txt("OLD_VALUE_CHANGED"),
+        "new_value_changed": _txt("NEW_VALUE_CHANGED"),
     })
     log = log.dropna(subset=["timestamp"])
 

@@ -52,12 +52,50 @@ def page_cases(sorted_log: pd.DataFrame, summary: pd.DataFrame,
     page_ids = ids[: max(0, limit)]
     sub = sorted_log[sorted_log[CASE_ID].isin(set(page_ids))]
 
+    # painel de detalhe por evento (Vedara): só quando as colunas crus existem
+    has_attrs = "source_activity" in sorted_log.columns
+
+    def _v(x):
+        if x is None or (not isinstance(x, str) and pd.isna(x)):
+            return "—"
+        s = str(x).strip()
+        return s if s and s.lower() != "nan" else "—"
+
+    def _event_attrs(cid, a, r):
+        et = r.get("eventtime_raw")
+        return {
+            "Activity En": _v(a),
+            "Case Key O2c": _v(cid),
+            "Cliente": _v(r.get("cliente")),
+            "Eventtime": (pd.to_datetime(et).strftime("%Y-%m-%d") if et is not None and not pd.isna(et) else "—"),
+            "Fat Item": _v(r.get("fat_item")),
+            "Fatura": _v(r.get("fatura")),
+            "New Value Changed": _v(r.get("new_value_changed")),
+            "Old Value Changed": _v(r.get("old_value_changed")),
+            "Orc Item": _v(r.get("orc_item")),
+            "Orcamento": _v(r.get("orcamento")),
+            "Ped Item": _v(r.get("ped_item")),
+            "Pedido": _v(r.get("pedido")),
+            "Prod Nome": _v(r.get("prod_nome")),
+            "Produto": _v(r.get("produto_cod")),
+            "Sorting": _v(r.get("sort")),
+            "Source Activity": _v(r.get("source_activity")),
+            "Usuario": _v(r.get("resource")),
+            "Vendedor": _v(r.get("vendedor")),
+        }
+
     timelines: dict[str, list] = {}
     for cid, g in sub.groupby(CASE_ID, sort=False):
         tl, prev = [], None
-        for a, t in zip(g[ACTIVITY].astype(str).tolist(), g[TIMESTAMP].tolist()):
+        recs = g.to_dict("records") if has_attrs else None
+        acts_list = g[ACTIVITY].astype(str).tolist()
+        ts_list = g[TIMESTAMP].tolist()
+        for idx, (a, t) in enumerate(zip(acts_list, ts_list)):
             delta = (t - prev).total_seconds() if prev is not None else None
-            tl.append({"label": a, "ts": t.isoformat(), "deltaSeconds": delta})
+            ev = {"label": a, "ts": t.isoformat(), "deltaSeconds": delta}
+            if has_attrs:
+                ev["attrs"] = _event_attrs(cid, a, recs[idx])
+            tl.append(ev)
             prev = t
         timelines[str(cid)] = tl
 

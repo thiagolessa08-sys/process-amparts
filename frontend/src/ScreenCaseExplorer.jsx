@@ -33,7 +33,9 @@ function fmtTs(iso) {
 /* ───────── painel de detalhes do caso ───────── */
 function CaseDetail({ caseObj, onPrev, onNext }) {
   const [search, setSearch] = useState("");
-  useEffect(() => { setSearch(""); }, [caseObj?.id]);
+  const [open, setOpen] = useState(() => new Set());
+  useEffect(() => { setSearch(""); setOpen(new Set()); }, [caseObj?.id]);
+  const toggle = (i) => setOpen((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
 
   if (!caseObj) {
     return <div className="cex-detail"><div className="cex-empty">Selecione um caso para ver os detalhes</div></div>;
@@ -57,16 +59,35 @@ function CaseDetail({ caseObj, onPrev, onNext }) {
         <span className="cex-acts-count">{acts.length} {acts.length === 1 ? "item" : "itens"}</span>
       </div>
       <div className="cex-acts">
-        {acts.map((a, i) => (
-          <div className="cex-act" key={i}>
-            <span className="cex-act-dot" />
-            <div className="cex-act-body">
-              <div className="cex-act-label">{a.label}</div>
-              <div className="cex-act-ts mono">{fmtTs(a.ts)}</div>
+        {acts.map((a, i) => {
+          const attrs = a.attrs && Object.entries(a.attrs);
+          const expandable = !!(attrs && attrs.length);
+          const isOpen = open.has(i);
+          return (
+            <div className={"cex-act" + (isOpen ? " open" : "")} key={i}>
+              <div className="cex-act-row" style={{ cursor: expandable ? "pointer" : "default" }}
+                onClick={() => expandable && toggle(i)}>
+                <span className="cex-act-dot" />
+                <div className="cex-act-body">
+                  <div className="cex-act-label">{a.label}</div>
+                  <div className="cex-act-ts mono">{fmtTs(a.ts)}</div>
+                </div>
+                {a.deltaSeconds != null && <span className="cex-act-delta mono">{fmtDelta(a.deltaSeconds)}</span>}
+                {expandable && <span className="cex-act-chev"><Icon name="chevronD" size={15} style={{ transform: isOpen ? "rotate(180deg)" : "none" }} /></span>}
+              </div>
+              {isOpen && expandable && (
+                <div className="cex-attrs">
+                  {attrs.map(([k, v]) => (
+                    <div className="cex-attr" key={k}>
+                      <span className="cex-attr-k">{k}</span>
+                      <span className="cex-attr-v mono">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            {a.deltaSeconds != null && <span className="cex-act-delta mono">{fmtDelta(a.deltaSeconds)}</span>}
-          </div>
-        ))}
+          );
+        })}
         {acts.length === 0 && <div className="cex-empty">Nenhuma atividade encontrada</div>}
       </div>
     </div>
