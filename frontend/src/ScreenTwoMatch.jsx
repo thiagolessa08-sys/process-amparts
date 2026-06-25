@@ -160,7 +160,7 @@ export function TwoMatchScreen({ data }) {
         </Panel>
 
         <Panel title="Pedidos Pendentes por Cliente" icon="variants" meta={dim}>
-          <div className="nf-wrap rwk-nf">
+          <div className="nf-wrap rwk-nf tm-pend-wrap">
             <table className="nf-table tm-table">
               <thead>
                 <tr><th>{dim}</th><th>Qtde Unidades</th><th>Itens Venda</th><th>Pedidos</th></tr>
