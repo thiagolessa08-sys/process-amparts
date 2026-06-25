@@ -13,6 +13,7 @@ from app.mining.variants import discover_variants
 from app.mining.activity_stats import activity_metrics
 from app.modules.headline import _fmt_compact, _spark, period_filters, case_ref_date
 from app.modules.rework import rework
+from app.modules.twomatch import two_match
 from app.modules.userprod import user_productivity
 from app.eventlog import CASE_ID, TIMESTAMP
 
@@ -152,7 +153,9 @@ class VedaraModule(ProcessModule):
             "rework": self._safe(
                 lambda: rework(log, "cliente", labels, top=60,
                            also_rework_acts=CANCEL, allowed_acts=REWORK_ACTS), {}),
-            "twoMatch": {"monthly": [], "pendentes": []},
+            "twoMatch": self._safe(
+                lambda: two_match(log, "cliente", invoice_activity=FAT, order_activity=PED),
+                {"monthly": [], "pendentes": []}),
             "userProd": self._safe(lambda: user_productivity(log), {}),
             "drill": {},
             "filters": {
