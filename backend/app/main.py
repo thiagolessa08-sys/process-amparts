@@ -15,7 +15,6 @@ from app import data_source
 from app import modules as module_registry
 from app.modules.cases import build_case_index, page_cases
 from app.connectors.csv_connector import CSVConnector
-from app.sources import cordeiro_queries as cq
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.stats import compute_statistics
@@ -165,8 +164,8 @@ def _apply_activity_filter(log: pd.DataFrame, module, act_id, act_mode) -> pd.Da
     return log[log[CASE_ID].isin(cases)]
 
 
-def _guard_cordeiro(key: str) -> None:
-    """Fontes reais (cordeiro/vedara): carga assíncrona. Nunca bloqueia/recarrega
+def _guard_real(key: str) -> None:
+    """Fonte real (Vedara): carga assíncrona. Nunca bloqueia/recarrega
     dentro do request — devolve 503 enquanto carrega (o front reexibe e reconsulta)."""
     if not data_source.is_real(key) or data_source._state["path"] is not None:
         return
@@ -213,9 +212,8 @@ def debug_config():
         "agent_api_key_set": bool(key),
         "agent_api_key_len": len(key),
         "anthropic_key_set": bool(os.environ.get("ANTHROPIC_API_KEY")),
-        "cordeiro_prewarm": os.environ.get("CORDEIRO_PREWARM", "1"),
-        "cordeiro_status": data_source.cordeiro_status(),
-        "cordeiro_error": data_source.cordeiro_error(),
+        "vedara_status": data_source.real_status("vedara"),
+        "vedara_error": data_source.real_error("vedara"),
     }
 
 
@@ -226,59 +224,11 @@ def _require_admin(token: Optional[str]) -> None:
         raise HTTPException(status_code=403, detail="Token de administração inválido")
 
 
-class QueryValidateBody(BaseModel):
-    source: str
-    table: str
-    columns: str
-    where: str = ""
-
-
-class QuerySaveBody(BaseModel):
-    sources: dict
-
-
-@app.get("/api/cordeiro/queries")
-def cordeiro_queries_get():
-    return {
-        "order": cq.ORDER,
-        "labels": cq.LABELS,
-        "sources": cq.get_config(),
-        "required": cq.REQUIRED_COLUMNS,
-        "defaults": cq.DEFAULT_QUERIES,
-        "customized": cq.is_customized(),
-        "aiConfigured": bool(os.environ.get("ANTHROPIC_API_KEY")),
-        "status": data_source.cordeiro_status(),
-    }
-
-
-@app.post("/api/cordeiro/queries/validate")
-def cordeiro_queries_validate(body: QueryValidateBody):
-    if body.source not in cq.STRUCT:
-        raise HTTPException(status_code=400, detail=f"Fonte desconhecida: {body.source}")
-    res = cq.validate_source(body.source, body.table, body.columns, body.where)
-    from app.ai.query_review import review_query
-    res["ai"] = review_query(
-        cq.LABELS.get(body.source, body.source), res["sql"],
-        res["error"], res["missing"], cq.REQUIRED_COLUMNS[body.source])
-    return res
-
-
-@app.post("/api/cordeiro/queries/preview")
-def cordeiro_queries_preview(body: QueryValidateBody):
-    if body.source not in cq.STRUCT:
-        raise HTTPException(status_code=400, detail=f"Fonte desconhecida: {body.source}")
-    return cq.preview_source(body.source, body.table, body.columns, body.where, limit=100)
-
-
 def _reload_real(key: str):
     data_source.refresh(key)
     _ENRICH_CACHE.clear()
     _CASES_CACHE.clear()
     data_source.start_real_load(key)
-
-
-def _reload_cordeiro():
-    _reload_real("cordeiro")
 
 
 @app.get("/api/modules/{key}/status")
@@ -303,23 +253,6 @@ def refresh_module(key: str, x_admin_token: Optional[str] = Header(default=None)
     return {"ok": True, "status": data_source.real_status(key)}
 
 
-@app.put("/api/cordeiro/queries")
-def cordeiro_queries_save(body: QuerySaveBody,
-                          x_admin_token: Optional[str] = Header(default=None)):
-    _require_admin(x_admin_token)
-    cfg = cq.save_config(body.sources)
-    _reload_cordeiro()
-    return {"ok": True, "sources": cfg, "status": data_source.cordeiro_status()}
-
-
-@app.post("/api/cordeiro/queries/reset")
-def cordeiro_queries_reset(x_admin_token: Optional[str] = Header(default=None)):
-    _require_admin(x_admin_token)
-    cq.reset_config()
-    _reload_cordeiro()
-    return {"ok": True, "sources": cq.get_config(), "status": data_source.cordeiro_status()}
-
-
 @app.get("/api/modules/{key}")
 def get_module(
     key: str,
@@ -338,7 +271,7 @@ def get_module(
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
-    _guard_cordeiro(key)
+    _guard_real(key)
     ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, tuple(sorted(dias)), produto,
           act_id, act_mode, tuple(sorted(variant)), variant_mode)
     cached = _ENRICH_CACHE.get(ck)
@@ -382,7 +315,7 @@ def get_cases(
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
-    _guard_cordeiro(key)
+    _guard_real(key)
 
     # índice (ordenar+resumir) é caro → cacheado por assinatura de filtro.
     # A busca por Case Id (q) e a página (limit) ficam fora da chave: rodam barato.

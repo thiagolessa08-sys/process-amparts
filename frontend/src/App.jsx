@@ -10,7 +10,6 @@ import { AssistantScreen } from "./ScreenAssistant.jsx";
 import { TwoMatchScreen } from "./ScreenTwoMatch.jsx";
 import { UserProdScreen } from "./ScreenUserProd.jsx";
 import { LoginScreen, readAuth, clearAuth } from "./ScreenLogin.jsx";
-import { QueryEditor } from "./QueryEditor.jsx";
 import { fetchModule, fetchModuleStatus, uploadCsv, refreshModule } from "./api.js";
 
 const SCREENS = [
@@ -214,7 +213,6 @@ export default function App() {
   const [polling, setPolling] = useState(false);   // fonte real carregando
   const [progress, setProgress] = useState(0);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [showQueries, setShowQueries] = useState(false);
   const fileRef = useRef(null);
   const yearDefaulted = useRef(null);   // controla o auto-set do último ano por módulo
 
@@ -412,16 +410,6 @@ export default function App() {
       </div>
 
       {drill && <DrillDrawer drill={drill} onClose={() => setDrill(null)} />}
-      {showQueries && (
-        <QueryEditor
-          onClose={() => setShowQueries(false)}
-          onApplied={() => {
-            setShowQueries(false);
-            flash("Recarregando o Cordeiro com as novas queries… (~1–2 min)");
-            load(moduleKey, filters);
-          }}
-        />
-      )}
       <Toast msg={toast} />
     </div>
   );

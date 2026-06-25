@@ -73,14 +73,10 @@ export async function askAssistant(key, question, filters = {}) {
   return res.json();
 }
 
-/* ───────── editor de queries-base do Cordeiro ───────── */
+/* ───────── recarga da fonte (admin) ───────── */
 function adminHeaders(extra = {}) {
   const t = (typeof localStorage !== "undefined" && localStorage.getItem("pm-admin-token")) || "";
   return t ? { ...extra, "X-Admin-Token": t } : extra;
-}
-
-export function fetchCordeiroQueries() {
-  return getJson("/api/cordeiro/queries");
 }
 
 async function sendJson(path, body, method = "POST") {
@@ -94,22 +90,6 @@ async function sendJson(path, body, method = "POST") {
     throw new Error(detail.detail || `Erro ${res.status}`);
   }
   return res.json();
-}
-
-export function validateCordeiroQuery(source, table, columns, where) {
-  return sendJson("/api/cordeiro/queries/validate", { source, table, columns, where });
-}
-
-export function previewCordeiroQuery(source, table, columns, where) {
-  return sendJson("/api/cordeiro/queries/preview", { source, table, columns, where });
-}
-
-export function saveCordeiroQueries(sources) {
-  return sendJson("/api/cordeiro/queries", { sources }, "PUT");
-}
-
-export function resetCordeiroQueries() {
-  return sendJson("/api/cordeiro/queries/reset", null);
 }
 
 export function refreshModule(key) {

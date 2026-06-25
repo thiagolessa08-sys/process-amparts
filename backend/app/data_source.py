@@ -1,32 +1,19 @@
-"""Mantem qual event log esta ativo por módulo.
+"""Mantem qual event log esta ativo.
 
-Fontes demo (p2p/o2c) são carregadas sob demanda do CSV. Fontes reais caras
-(cordeiro, vedara) são carregadas UMA vez em background (thread), nunca dentro
-do request HTTP — para não estourar memória/timeout no servidor de produção.
+A fonte real (Vedara, banco via agent) é carregada UMA vez em background
+(thread), nunca dentro do request HTTP — para não estourar memória/timeout no
+servidor de produção. Um CSV enviado por upload sobrepõe a fonte real.
 """
 import importlib
 import threading
-from pathlib import Path
 
 import pandas as pd
 
 from app.connectors.csv_connector import CSVConnector
-from app.demo.generate_p2p import write_demo_csv as write_p2p
-from app.demo.generate_o2c import write_demo_csv as write_o2c
-
-DEMO_PATHS = {
-    "p2p": "data/demo_p2p.csv",
-    "o2c": "data/demo_o2c.csv",
-}
-DEMO_WRITERS = {
-    "p2p": write_p2p,
-    "o2c": write_o2c,
-}
 
 # fontes reais (banco via agent): módulo:função do loader
 REAL_LOADERS = {
-    "cordeiro": ("app.sources.cordeiro", "load_cordeiro_eventlog"),
-    "vedara":   ("app.sources.vedara",   "load_vedara_eventlog"),
+    "vedara": ("app.sources.vedara", "load_vedara_eventlog"),
 }
 
 _state = {"path": None}                       # override manual (upload)
@@ -98,19 +85,6 @@ def is_real(key: str) -> bool:
     return key in REAL_LOADERS
 
 
-# compat: helpers antigos do Cordeiro
-def start_cordeiro_load() -> None:
-    start_real_load("cordeiro")
-
-
-def cordeiro_status() -> str:
-    return real_status("cordeiro")
-
-
-def cordeiro_error() -> str | None:
-    return real_error("cordeiro")
-
-
 def refresh(module_key: str) -> None:
     """Descarta o cache de uma fonte real para forçar recarga."""
     _cache.pop(module_key, None)
@@ -119,20 +93,15 @@ def refresh(module_key: str) -> None:
 
 
 # ── API geral ────────────────────────────────────────────────────────────────
-def get_log(module_key: str = "p2p") -> pd.DataFrame:
-    if _state["path"] is None and module_key in REAL_LOADERS:
-        if module_key in _cache:
-            return _cache[module_key]
-        # fallback (ex.: testes/CLI): carga síncrona sob demanda
-        _cache[module_key] = _load_real(module_key)
+def get_log(module_key: str = "vedara") -> pd.DataFrame:
+    # CSV enviado por upload sobrepõe a fonte real
+    if _state["path"] is not None:
+        return CSVConnector(_state["path"]).load()
+    if module_key in _cache:
         return _cache[module_key]
-    path = _state["path"]
-    if path is None:
-        demo = DEMO_PATHS.get(module_key, DEMO_PATHS["p2p"])
-        if not Path(demo).exists():
-            DEMO_WRITERS[module_key](demo)
-        path = demo
-    return CSVConnector(path).load()
+    # fallback (ex.: testes/CLI): carga síncrona sob demanda
+    _cache[module_key] = _load_real(module_key)
+    return _cache[module_key]
 
 
 def set_source(path: str) -> None:
