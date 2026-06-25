@@ -60,19 +60,21 @@ function CanceladosPanel({ rows = [] }) {
         <span className="ph-meta">{rows.length} meses</span>
       </div>
       <div className="panel-body">
-        <div className="hbars">
+        <div className="dotplot pink">
           {rows.map((r) => (
-            <div className="hbrow" key={r.mes}>
-              <div className="hbl">{r.mes}</div>
-              <div className="hbtrack"><div className="hbfill" style={{ width: (r.count / max) * 100 + "%" }} /></div>
-              <div className="hbv">{r.count}</div>
+            <div className="dprow" key={r.mes}>
+              <div className="dpl" title={r.mes}>{r.mes}</div>
+              <div className="dpbar">
+                <div className="dptrack">
+                  <div className="dpfill" style={{ width: (r.count / max) * 100 + "%" }} title={`${r.mes}: ${r.count}`} />
+                </div>
+                <div className="dpv">{r.count}</div>
+              </div>
             </div>
           ))}
         </div>
-        <div className="hbaxis">
-          <span />
-          <div className="hbticks">{ticks.map((t, i) => <span key={i}>{t}</span>)}</div>
-          <span />
+        <div className="dpaxis">
+          <div className="dpticks">{ticks.map((t, i) => <span key={i}>{t}</span>)}</div>
         </div>
       </div>
     </div>

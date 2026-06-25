@@ -443,6 +443,7 @@
     transition: width .5s cubic-bezier(.2,.7,.3,1);
   }
   .dotplot.green .dpfill { background: linear-gradient(90deg, #5fcfae, #16a34a); }
+  .dotplot.pink .dpfill { background: linear-gradient(90deg, #f7b8d6, #ef8fc0); }
   .dpv {
     font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600;
     color: var(--ink-2); text-align: right;
