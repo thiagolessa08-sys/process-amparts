@@ -11,35 +11,8 @@ function fmtCompact(n) {
 const fmtBRL = (n) => fmtCompact(n) + " R$";
 const fmtInt = (n) => (Number(n) || 0).toLocaleString("pt-BR");
 
-/* paleta verde (do mais escuro ao mais claro) + cinza p/ "Outros" */
-const GREENS = ["#166534", "#15803d", "#16a34a", "#22c55e", "#4ade80",
-                "#86efac", "#bbf7d0", "#0e7a5f", "#3aa17e", "#7fc8ad"];
+/* cinza p/ a fatia "Outros" */
 const GREY = "#a9add0";
-
-/* ───────── Donut (TOP clientes) ───────── */
-function Donut({ data, size = 150, sw = 22 }) {
-  const r = (size - sw) / 2, c = 2 * Math.PI * r;
-  let acc = 0;
-  return (
-    <svg className="clients-donut" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line-2)" strokeWidth={sw} />
-        {data.map((d, i) => {
-          const len = c * (d.pct / 100);
-          const el = (
-            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none"
-              stroke={d.color} strokeWidth={sw}
-              strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-acc}>
-              <title>{d.nome}: {d.pct}%</title>
-            </circle>
-          );
-          acc += len;
-          return el;
-        })}
-      </g>
-    </svg>
-  );
-}
 
 /* ───────── Painéis ───────── */
 function ProdutosPanel({ rows = [] }) {
@@ -60,7 +33,7 @@ function ProdutosPanel({ rows = [] }) {
               <div className="dpl" title={r.produto}>{r.produto}</div>
               <div className="dpbar">
                 <div className="dptrack">
-                  <span className="dpdot" style={{ left: (r.itens / max) * 100 + "%" }} title={`${r.produto}: ${fmtInt(r.itens)} itens`} />
+                  <div className="dpfill" style={{ width: (r.itens / max) * 100 + "%" }} title={`${r.produto}: ${fmtInt(r.itens)} itens`} />
                 </div>
                 <div className="dpv">{fmtInt(r.itens)}</div>
               </div>
@@ -107,10 +80,8 @@ function CanceladosPanel({ rows = [] }) {
 }
 
 function ClientesPanel({ rows = [], dim }) {
-  const data = rows.map((r, i) => ({
-    ...r,
-    color: r.nome === "Outros" ? GREY : GREENS[i % GREENS.length],
-  }));
+  const max = Math.max(0.001, ...rows.map((r) => r.pct));
+  const fmtPct = (p) => p.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
   return (
     <div className="panel">
       <div className="panel-head">
@@ -120,17 +91,18 @@ function ClientesPanel({ rows = [], dim }) {
         <span className="ph-meta">% do valor</span>
       </div>
       <div className="panel-body">
-        <div className="clients">
-          <Donut data={data} />
-          <div className="clients-legend">
-            {data.map((d) => (
-              <div className={"lchip" + (d.nome === "Outros" ? " more" : "")} key={d.nome}>
-                <span className="sw" style={{ background: d.color }} />
-                <span className="lc">{d.nome}</span>
-                <span className="lp">{d.pct.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
+        <div className="dotplot green">
+          {rows.map((r) => (
+            <div className="dprow" key={r.nome}>
+              <div className="dpl" title={r.nome}>{r.nome}</div>
+              <div className="dpbar">
+                <div className="dptrack">
+                  <div className="dpfill" style={{ width: (r.pct / max) * 100 + "%", ...(r.nome === "Outros" ? { background: GREY } : {}) }} title={`${r.nome}: ${fmtPct(r.pct)}`} />
+                </div>
+                <div className="dpv">{fmtPct(r.pct)}</div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

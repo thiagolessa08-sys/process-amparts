@@ -427,26 +427,22 @@
   }
   .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
-  /* dot plot — TOP Produtos */
+  /* barras horizontais (nome em cima) — TOP Produtos / TOP Clientes */
   .dotplot { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-  .dprow { display: flex; flex-direction: column; gap: 4px; padding: 7px 0; border-bottom: 1px solid var(--line-2); }
+  .dprow { display: flex; flex-direction: column; gap: 5px; padding: 7px 0; border-bottom: 1px solid var(--line-2); }
   .dprow:last-child { border-bottom: none; }
   .dprow .dpl {
     font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500;
     color: var(--ink-2); line-height: 1.35; word-break: break-word;
   }
   .dpbar { display: grid; grid-template-columns: 1fr 56px; align-items: center; gap: 10px; }
-  .dptrack { position: relative; height: 16px; border-left: 1px dashed var(--line); }
-  .dptrack::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dotted var(--line-2); }
-  .dpdot {
-    position: absolute; top: 50%; transform: translate(-50%, -50%);
-    width: 13px; height: 13px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #8fb4ff, #5b8def);
-    border: 1.5px solid var(--panel);
-    box-shadow: 0 2px 6px -1px rgba(91,141,239,.55);
-    cursor: pointer; transition: transform .12s ease;
+  .dptrack { position: relative; height: 15px; background: var(--line-2); border-radius: 5px; overflow: hidden; }
+  .dpfill {
+    height: 100%; border-radius: 5px; min-width: 2px;
+    background: linear-gradient(90deg, #8fb4ff, #5b8def);
+    transition: width .5s cubic-bezier(.2,.7,.3,1);
   }
-  .dpdot:hover { transform: translate(-50%, -50%) scale(1.25); }
+  .dotplot.green .dpfill { background: linear-gradient(90deg, #5fcfae, #16a34a); }
   .dpv {
     font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600;
     color: var(--ink-2); text-align: right;
