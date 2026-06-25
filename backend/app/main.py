@@ -59,7 +59,7 @@ def _apply_filters(
     end_date: Optional[str],
     ano: Optional[int] = None,
     mes: Optional[int] = None,
-    dia: Optional[int] = None,
+    dias: Optional[list[int]] = None,
     produto: Optional[str] = None,
     order_activity: Optional[str] = None,
 ) -> pd.DataFrame:
@@ -80,18 +80,18 @@ def _apply_filters(
         cases_with = log[log["produto"] == produto][CASE_ID].unique()
         log = log[log[CASE_ID].isin(cases_with)]
 
-    if ano or mes or dia or start_date or end_date:
+    if ano or mes or dias or start_date or end_date:
         log[TIMESTAMP] = pd.to_datetime(log[TIMESTAMP])
         ref = _case_ref_date(log, order_activity)
 
-    if ano or mes or dia:
+    if ano or mes or dias:
         valid = ref
         if ano:
             valid = valid[valid.dt.year == ano]
         if mes:
             valid = valid[valid.dt.month == mes]
-        if dia:
-            valid = valid[valid.dt.day == dia]
+        if dias:
+            valid = valid[valid.dt.day.isin(dias)]
         log = log[log[CASE_ID].isin(valid.index)]
 
     if start_date or end_date:
@@ -328,7 +328,7 @@ def get_module(
     end_date:   Optional[str] = Query(default=None),
     ano: Optional[int] = Query(default=None),
     mes: Optional[int] = Query(default=None),
-    dia: Optional[int] = Query(default=None),
+    dias: list[int] = Query(default=[]),
     produto: Optional[str] = Query(default=None),
     act_id: Optional[str] = Query(default=None),
     act_mode: Optional[str] = Query(default=None),
@@ -339,13 +339,13 @@ def get_module(
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
     _guard_cordeiro(key)
-    ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, dia, produto,
+    ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, tuple(sorted(dias)), produto,
           act_id, act_mode, tuple(sorted(variant)), variant_mode)
     cached = _ENRICH_CACHE.get(ck)
     if cached is not None:
         return cached
     log = data_source.get_log(module_key=key)
-    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto,
+    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dias, produto,
                          order_activity=module.order_activity)
     log = _apply_activity_filter(log, module, act_id, act_mode)
     log = _apply_variant_filter(log, module, variant, variant_mode)
@@ -370,7 +370,7 @@ def get_cases(
     end_date:   Optional[str] = Query(default=None),
     ano: Optional[int] = Query(default=None),
     mes: Optional[int] = Query(default=None),
-    dia: Optional[int] = Query(default=None),
+    dias: list[int] = Query(default=[]),
     produto: Optional[str] = Query(default=None),
     act_id: Optional[str] = Query(default=None),
     act_mode: Optional[str] = Query(default=None),
@@ -386,12 +386,12 @@ def get_cases(
 
     # índice (ordenar+resumir) é caro → cacheado por assinatura de filtro.
     # A busca por Case Id (q) e a página (limit) ficam fora da chave: rodam barato.
-    sig = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, dia, produto,
+    sig = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, tuple(sorted(dias)), produto,
            act_id, act_mode, tuple(sorted(variant)), variant_mode)
     idx = _CASES_CACHE.get(sig)
     if idx is None:
         log = data_source.get_log(module_key=key)
-        log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dia, produto,
+        log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dias, produto,
                              order_activity=module.order_activity)
         log = _apply_activity_filter(log, module, act_id, act_mode)
         log = _apply_variant_filter(log, module, variant, variant_mode)

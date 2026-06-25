@@ -24,7 +24,7 @@ const SCREENS = [
   { id: "cases", label: "Case Explorer", icon: "search" },
   { id: "assistant", label: "Assistente IA", icon: "bolt" },
 ];
-const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", dia: "", produto: "", activity: null, variantKeys: [], variantMode: "include" };
+const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", dias: [], produto: "", activity: null, variantKeys: [], variantMode: "include" };
 
 const ACT_MODE_LABEL = { with: "Com", without: "Sem", start: "Inicia em", end: "Termina em" };
 
@@ -41,6 +41,47 @@ function Spark({ data }) {
     <svg className="kpi-spark" viewBox={`0 0 ${w} ${h}`} fill="none" preserveAspectRatio="none">
       <polyline points={pts} style={{ stroke: "var(--kpi-line)" }} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+/* dropdown de múltiplos dias (checkboxes) — filtro "Dia do Pedido" */
+function DayMultiSelect({ days, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const toggle = (d) => {
+    const set = new Set(value);
+    set.has(d) ? set.delete(d) : set.add(d);
+    onChange([...set].sort((a, b) => a - b));
+  };
+  const label = value.length === 0 ? "Dia do Pedido"
+    : value.length === 1 ? `Dia ${value[0]}` : `${value.length} dias`;
+  return (
+    <div className={"selectwrap daysel" + (value.length ? " active" : "")} ref={ref}>
+      <span className="lead"><Icon name="calendar" size={14} /></span>
+      <button type="button" className="daysel-btn" onClick={() => setOpen((o) => !o)}>{label}</button>
+      <span className="caret"><Icon name="chevronD" size={14} /></span>
+      {open && (
+        <div className="daysel-pop">
+          <div className="daysel-head">
+            <span>{value.length} selecionado(s)</span>
+            {value.length > 0 && <button type="button" onClick={() => onChange([])}>Limpar</button>}
+          </div>
+          <div className="daysel-grid">
+            {days.map((d) => (
+              <label key={d} className={"daysel-item" + (value.includes(d) ? " on" : "")}>
+                <input type="checkbox" checked={value.includes(d)} onChange={() => toggle(d)} />{d}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -78,14 +119,7 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
             <span className="caret"><Icon name="chevronD" size={14} /></span>
           </div>
           {(f.dias?.length > 0) && (
-            <div className="selectwrap">
-              <span className="lead"><Icon name="calendar" size={14} /></span>
-              <select value={filters.dia} onChange={(e) => setFilter({ dia: e.target.value ? Number(e.target.value) : "" })}>
-                <option value="">Dia do Pedido</option>
-                {(f.dias || []).map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <span className="caret"><Icon name="chevronD" size={14} /></span>
-            </div>
+            <DayMultiSelect days={f.dias} value={filters.dias || []} onChange={(dias) => setFilter({ dias })} />
           )}
           <div className="selectwrap supplier">
             <span className="lead"><Icon name="truck" size={14} /></span>
@@ -182,6 +216,7 @@ export default function App() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [showQueries, setShowQueries] = useState(false);
   const fileRef = useRef(null);
+  const yearDefaulted = useRef(null);   // controla o auto-set do último ano por módulo
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2400); };
   const openDrill = (key) => setDrill(data?.drill?.[key] || null);
@@ -215,11 +250,20 @@ export default function App() {
     return () => { alive = false; clearInterval(id); };
   }, [polling, moduleKey, filters, load]);
 
-  useEffect(() => { setFilters(EMPTY_FILTERS); load(moduleKey, EMPTY_FILTERS); }, [moduleKey, load]);
+  useEffect(() => { yearDefaulted.current = null; setFilters(EMPTY_FILTERS); load(moduleKey, EMPTY_FILTERS); }, [moduleKey, load]);
   useEffect(() => { setDrill(null); }, [moduleKey, screen]);
 
   const onFiltersChange = useCallback((f) => { setFilters(f); load(moduleKey, f); }, [moduleKey, load]);
   const setFilter = useCallback((patch) => { onFiltersChange({ ...filters, ...patch }); }, [filters, onFiltersChange]);
+
+  // ano sempre no último: ao carregar um módulo, pré-seleciona o ano mais
+  // recente disponível (uma vez por módulo; o usuário pode trocar/limpar depois)
+  useEffect(() => {
+    if (!data || data.key !== moduleKey || yearDefaulted.current === moduleKey) return;
+    const years = data.filters?.years || [];
+    yearDefaulted.current = moduleKey;
+    if (years.length && !filters.ano) onFiltersChange({ ...filters, ano: Math.max(...years) });
+  }, [data, moduleKey, filters, onFiltersChange]);
 
   async function onRefresh() {
     flash("Recarregando dados do banco… (~1–2 min). Recarregue em instantes.");

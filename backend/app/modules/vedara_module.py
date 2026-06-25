@@ -75,8 +75,9 @@ class VedaraModule(ProcessModule):
                     if a in CANCEL and BRANCH_PARENT.get(a) in spine}
 
         # ── nós ──
-        nodes, y = [], 120
+        nodes, y, spine_y = [], 120, {}
         for nid in spine:
+            spine_y[nid] = y
             m = node_metrics.get(nid, {})
             node = {"id": nid, "label": _title(nid), "x": 300, "y": y,
                     "cases": m.get("count", 0), "avgDwell": _fmt_days(m.get("avg_dwell_seconds", 0))}
@@ -84,9 +85,11 @@ class VedaraModule(ProcessModule):
                 node.update(act_stats[nid])
             nodes.append(node)
             y += 130
+        # cancelamentos como ramos laterais: ao lado (à direita) do nó-pai, na
+        # mesma altura — assim não se empilham sobre a espinha nem entre si
         for bid, parent in branches.items():
             m = node_metrics.get(bid, {})
-            node = {"id": bid, "label": _title(bid), "x": 300, "y": 400,
+            node = {"id": bid, "label": _title(bid), "x": 540, "y": spine_y.get(parent, 400),
                     "cases": m.get("count", 0), "avgDwell": _fmt_days(m.get("avg_dwell_seconds", 0)),
                     "branch": True}
             if bid in act_stats:

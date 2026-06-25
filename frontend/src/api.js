@@ -20,7 +20,7 @@ function filterParams(filters = {}) {
   if (filters.endDate)   params.set("end_date",   filters.endDate);
   if (filters.ano)       params.set("ano", filters.ano);
   if (filters.mes)       params.set("mes", filters.mes);
-  if (filters.dia)     params.set("dia",     filters.dia);
+  if (filters.dias?.length) filters.dias.forEach((d) => params.append("dias", d));
   if (filters.produto) params.set("produto", filters.produto);
   if (filters.variantKeys?.length) {
     filters.variantKeys.forEach((k) => params.append("variant", k));
