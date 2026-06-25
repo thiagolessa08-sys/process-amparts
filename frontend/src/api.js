@@ -50,6 +50,15 @@ export function fetchCases(key, filters = {}, opts = {}) {
   return getJson(`/api/modules/${key}/cases${qs ? "?" + qs : ""}`);
 }
 
+export function fetchDetails(key, filters = {}, opts = {}) {
+  const params = new URLSearchParams(filterParams(filters));
+  if (opts.q && opts.q.trim()) params.set("q", opts.q.trim());
+  if (opts.limit) params.set("limit", opts.limit);
+  if (opts.offset) params.set("offset", opts.offset);
+  const qs = params.toString();
+  return getJson(`/api/modules/${key}/details${qs ? "?" + qs : ""}`);
+}
+
 export function fetchUser(key, name, filters = {}) {
   const qs = filterParams(filters);
   return getJson(`/api/modules/${key}/user/${encodeURIComponent(name)}${qs ? "?" + qs : ""}`);

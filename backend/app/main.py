@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 from pathlib import Path
 from typing import Optional
@@ -336,6 +337,60 @@ def get_cases(
         _CASES_CACHE[sig] = idx
     sorted_log, summary = idx
     return page_cases(sorted_log, summary, q=q, limit=limit)
+
+
+_DETAIL_COLS = [
+    {"key": "nrPed", "label": "Nr. PED"}, {"key": "data", "label": "Data"},
+    {"key": "nrOrc", "label": "Nr. ORC"}, {"key": "itemOrc", "label": "Item ORC"},
+    {"key": "nrNf", "label": "Nr. NF"}, {"key": "cliente", "label": "Cliente"},
+    {"key": "produto", "label": "Produto"}, {"key": "qtde", "label": "Qtde Itens"},
+    {"key": "valor", "label": "Valor Total"},
+]
+
+
+@app.get("/api/modules/{key}/details")
+def get_details(
+    key: str,
+    ano: Optional[int] = Query(default=None),
+    mes: Optional[int] = Query(default=None),
+    dias: list[int] = Query(default=[]),
+    produto: Optional[str] = Query(default=None),
+    q: Optional[str] = Query(default=None),
+    limit: int = Query(default=500),
+    offset: int = Query(default=0),
+):
+    """Detalhe da SQL_PM_CASES (uma linha por caso) — tela Detalhes."""
+    module = module_registry.get(key)
+    if not module:
+        raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
+    _guard_real(key)
+    from app.sources import vedara as vedara_src
+    df = vedara_src.get_cases_detail()
+    if df.empty:
+        return {"rows": [], "total": 0, "columns": _DETAIL_COLS}
+
+    df = df.copy()
+    dt = pd.to_datetime(df["data"], errors="coerce")
+    mask = pd.Series(True, index=df.index)
+    if ano:
+        mask &= (dt.dt.year == ano)
+    if mes:
+        mask &= (dt.dt.month == mes)
+    if dias:
+        mask &= dt.dt.day.isin(dias)
+    if produto:
+        mask &= (df["produto"].astype(str) == produto)
+    if q and q.strip():
+        ql = q.strip().lower()
+        hay = (df["nrPed"].astype(str) + " " + df["cliente"].astype(str) + " "
+               + df["produto"].astype(str)).str.lower()
+        mask &= hay.str.contains(ql, regex=False, na=False)
+    df = df[mask]
+
+    total = int(len(df))
+    page = df.iloc[offset: offset + max(0, limit)]
+    rows = json.loads(page.to_json(orient="records"))
+    return {"rows": rows, "total": total, "columns": _DETAIL_COLS}
 
 
 class AskBody(BaseModel):

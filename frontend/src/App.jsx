@@ -6,6 +6,7 @@ import { DashboardScreen } from "./ScreenDashboard.jsx";
 import { OverviewScreen } from "./ScreenOverview.jsx";
 import { ReworkScreen } from "./ScreenRework.jsx";
 import { CaseExplorerScreen } from "./ScreenCaseExplorer.jsx";
+import { DetailsScreen } from "./ScreenDetails.jsx";
 import { AssistantScreen } from "./ScreenAssistant.jsx";
 import { TwoMatchScreen } from "./ScreenTwoMatch.jsx";
 import { UserProdScreen } from "./ScreenUserProd.jsx";
@@ -21,6 +22,7 @@ const SCREENS = [
   { id: "userprod", label: "Produtividade", icon: "variants" },
   { id: "overview", label: "Visão Geral", icon: "dashboard" },
   { id: "cases", label: "Case Explorer", icon: "search" },
+  { id: "details", label: "Detalhes", icon: "layers" },
   { id: "assistant", label: "Assistente IA", icon: "bolt" },
 ];
 const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", dias: [], produto: "", activity: null, variantKeys: [], variantMode: "include" };
@@ -93,7 +95,6 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
       <div className="title-block">
         <div className="title-row">
           <h1>{headInfo.title}</h1>
-          {data && <span className="badge">{data.short}</span>}
         </div>
         {headInfo.sub && <span className="subtitle">{headInfo.sub}</span>}
       </div>
@@ -293,6 +294,7 @@ export default function App() {
     twomatch:  { title: "2 Way Match", sub: <>Pedido × Faturamento</> },
     userprod:  { title: "Produtividade de Usuário", sub: <>Atividade por usuário (recurso)</> },
     cases:     { title: "Case Explorer", sub: <>Explore casos individuais — <b>{data.totalCases.toLocaleString("pt-BR")}</b> casos</> },
+    details:   { title: "Detalhes", sub: <>Pedidos por item (orçamento · pedido · nota fiscal)</> },
     assistant: { title: "Assistente IA", sub: <>Pergunte sobre o processo em linguagem natural</> },
   }[screen];
 
@@ -316,7 +318,7 @@ export default function App() {
         </div>
         <div className="tabs">
           <button className={moduleKey === "vedara" ? "on" : ""} onClick={() => setModuleKey("vedara")}>
-            <span className="pdot" style={{ background: "#0e9f93" }} />Vedara-O2C
+            <span className="pdot" style={{ background: "#0e9f93" }} />Veddara-O2C
           </button>
         </div>
         <span className="spacer" />
@@ -358,7 +360,7 @@ export default function App() {
           <div className="file-card">
             <span className="fi"><Icon name="database" size={16} /></span>
             <div>
-              <div className="fn">{data?.short || "Vedara-O2C"} · banco</div>
+              <div className="fn">{data?.short || "Veddara-O2C"} · banco</div>
               <div className="fs">{data ? `${data.totalCases.toLocaleString("pt-BR")} casos` : "—"}</div>
             </div>
           </div>
@@ -400,6 +402,7 @@ export default function App() {
               {screen === "twomatch" && <div className="screen-fill" style={{ overflowY: "auto" }}><TwoMatchScreen key={moduleKey} data={data} /></div>}
               {screen === "userprod" && <div className="screen-fill" style={{ overflowY: "auto" }}><UserProdScreen key={moduleKey} data={data} filters={filters} /></div>}
               {screen === "cases" && <div className="screen-fill"><CaseExplorerScreen key={moduleKey} data={data} filters={filters} /></div>}
+              {screen === "details" && <div className="screen-fill"><DetailsScreen key={moduleKey} data={data} filters={filters} /></div>}
               {screen === "assistant" && <div className="screen-fill"><AssistantScreen key={moduleKey} data={data} filters={filters} /></div>}
               {screen === "explorer" && <ExplorerScreen key={moduleKey} data={data} filters={filters} onFiltersChange={onFiltersChange} />}
               {screen === "variants" && <div className="screen-fill"><VariantsScreen key={moduleKey} data={data} /></div>}

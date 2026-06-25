@@ -16,6 +16,14 @@ CASE_TABLE = f"{SCHEMA}.SQL_PM_CASES"
 # recorte do período: só eventos a partir de 2024
 DESDE = "2024-01-01"
 
+# detalhe da SQL_PM_CASES (tela "Detalhes"), preenchido após a carga
+_CASES_DETAIL: pd.DataFrame | None = None
+
+
+def get_cases_detail() -> pd.DataFrame:
+    """DataFrame de detalhe (uma linha por caso) da SQL_PM_CASES, ou vazio."""
+    return _CASES_DETAIL if _CASES_DETAIL is not None else pd.DataFrame()
+
 
 def _num(s):
     return pd.to_numeric(s, errors="coerce")
@@ -42,9 +50,26 @@ def load_vedara_eventlog(conn: AgentConnector | None = None, progress=None) -> p
         on_rows=lambda n: progress(3 + 80 * min(n, total) / total))
     progress(84)
     cases = conn.paginate_offset(
-        "_CASE_KEY_O2C, VL_ORC_TOTAL_ITEM, NOME_REP",
+        "_CASE_KEY_O2C, NR_PEDIDO, DT_PEDIDO, NR_ORCAMENTO, NR_ITEM_ORCAMENTO, "
+        "NR_INVOICE, CD_CLIENTE, NOME_CLIENTE, NOME_PRODUTO, QT_ORC_ITEM, "
+        "VL_ORC_TOTAL_ITEM, NOME_REP",
         CASE_TABLE, order="_CASE_KEY_O2C")
     progress(90)
+
+    # detalhe para a tela "Detalhes" (uma linha por caso)
+    global _CASES_DETAIL
+    if not cases.empty:
+        _CASES_DETAIL = pd.DataFrame({
+            "nrPed": cases["NR_PEDIDO"],
+            "data": pd.to_datetime(cases["DT_PEDIDO"], errors="coerce").dt.strftime("%Y-%m-%d"),
+            "nrOrc": cases["NR_ORCAMENTO"],
+            "itemOrc": cases["NR_ITEM_ORCAMENTO"],
+            "nrNf": cases["NR_INVOICE"],
+            "cliente": cases["CD_CLIENTE"],
+            "produto": cases["NOME_PRODUTO"],
+            "qtde": _num(cases["QT_ORC_ITEM"]),
+            "valor": _num(cases["VL_ORC_TOTAL_ITEM"]),
+        })
 
     eventtime = pd.to_datetime(acts["EVENTTIME"], errors="coerce")
     sort = _num(acts["SORTING"]).fillna(0)
