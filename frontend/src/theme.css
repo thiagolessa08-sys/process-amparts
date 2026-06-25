@@ -266,9 +266,9 @@
     background: var(--panel);
     border-bottom: 1px solid var(--line);
     z-index: 15;
-    overflow-x: auto; /* rola só a ribbon em telas estreitas, sem esticar o conteúdo */
+    /* KPIs ficam na 1ª linha (à direita); em telas menores quem comprime e
+       quebra em mais linhas é a área de filtros (.filter-group wrap) */
   }
-  .ribbon::-webkit-scrollbar { height: 0; }
   .ribbon-rule {
     align-self: stretch;
     width: 1px;
@@ -283,8 +283,8 @@
   .title-block .subtitle { font-size: 12px; color: var(--muted); font-weight: 500; white-space: nowrap; }
   .title-block .subtitle b { color: var(--ink-2); font-weight: 600; }
 
-  .filter-col { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex-shrink: 0; }
-  .filter-group { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .filter-col { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+  .filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 8px; }
   .selectwrap { position: relative; width: 150px; }
   .selectwrap.supplier { width: 200px; }
   .selectwrap .lead {
@@ -311,6 +311,9 @@
   .selectwrap select:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-50); }
 
   .ribbon-spacer { flex: 1; min-width: 8px; }
+  /* KPIs do cabeçalho como bloco: quando não cabem, quebram juntos para a
+     linha de baixo (em vez de 2+1 desalinhado) — ribbon mais baixo no laptop */
+  .ribbon-kpis { display: flex; align-items: center; gap: 10px; flex-shrink: 0; align-self: flex-start; }
   .export-btn { flex-shrink: 0; }
 
   .kpi {
@@ -475,7 +478,7 @@
   .nf-wrap { overflow: auto; flex: 1; min-height: 0; }
   .nf-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
   .nf-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
-  .nf-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .nf-table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 12.5px; }
   .nf-table thead th {
     text-align: right; font-weight: 700; color: var(--faint);
     font-size: 10.5px; letter-spacing: 0.03em; text-transform: uppercase;
@@ -546,7 +549,7 @@
   .cex-table-wrap { flex: 1; min-height: 0; overflow: auto; }
   .cex-table-wrap::-webkit-scrollbar { width: 9px; height: 9px; }
   .cex-table-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
-  .cex-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .cex-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 12.5px; }
   .cex-table thead th {
     position: sticky; top: 0; z-index: 1; background: var(--panel);
     text-align: left; font-weight: 700; color: var(--faint);
@@ -1528,3 +1531,17 @@
 .qe-foot .btn.primary { background: var(--violet); border-color: var(--violet); color: #fff; }
 .qe-foot .btn.primary:hover { filter: brightness(1.05); }
 .qe-foot .btn:disabled { opacity: .55; cursor: default; }
+
+/* ============ Responsivo: laptops 1280–1440 (escopo "não quebrar") ============ */
+/* Grids densos perdem colunas em telas menores para os cards/painéis não
+   ficarem espremidos. Em monitores largos nada muda. */
+@media (max-width: 1440px) {
+  .up-kpis-6 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 1300px) {
+  /* telas com scroll vertical próprio (.screen-fill) podem empilhar com segurança */
+  .ov-grid { grid-template-columns: 1fr; }
+  .up-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+/* Retrabalho NÃO empilha: é layout de altura fixa (sem scroll próprio) e seu
+   grid 2-col já é fluido (minmax) até ~1000px — empilhar cortaria conteúdo. */
