@@ -48,8 +48,8 @@ def _fmt_days(seconds: float) -> str:
 
 class VedaraModule(ProcessModule):
     key   = "vedara"
-    name  = "Vedara — O2C (SAP)"
-    short = "Vedara"
+    name  = "Vedara-O2C"
+    short = "Vedara-O2C"
     color = "#0e9f93"
     ideal_path = HAPPY
     activity_map: dict = {}  # identidade: a atividade já é o id

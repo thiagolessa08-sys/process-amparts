@@ -48,8 +48,8 @@ def _prewarm():
     para o usuário não esperar no primeiro clique. Silencioso se o agent estiver fora."""
     if os.environ.get("CORDEIRO_PREWARM", "1") != "1":
         return
-    for key in data_source.REAL_LOADERS:
-        data_source.start_real_load(key)
+    # apenas o Vedara-O2C é exposto; não pré-aquecer outras fontes
+    data_source.start_real_load("vedara")
 
 
 def _apply_filters(

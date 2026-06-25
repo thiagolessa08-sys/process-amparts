@@ -203,7 +203,7 @@ function Toast({ msg }) {
 
 export default function App() {
   const [auth, setAuth]       = useState(() => readAuth());
-  const [moduleKey, setModuleKey] = useState("p2p");
+  const [moduleKey, setModuleKey] = useState("vedara");
   const [screen, setScreen]   = useState("explorer");
   const [dark, setDark]       = useTheme();
   const [drill, setDrill]     = useState(null);
@@ -317,39 +317,15 @@ export default function App() {
           <span className="name">Fluxo<span className="dim">·mining</span></span>
         </div>
         <div className="tabs">
-          <button className={moduleKey === "p2p" ? "on" : ""} onClick={() => setModuleKey("p2p")}>
-            <span className="pdot" style={{ background: "#5a2fe0" }} />P2P
-          </button>
-          <button className={moduleKey === "o2c" ? "on" : ""} onClick={() => setModuleKey("o2c")}>
-            <span className="pdot" style={{ background: "#16a34a" }} />O2C
-          </button>
-          <button className={moduleKey === "cordeiro" ? "on" : ""} onClick={() => setModuleKey("cordeiro")}>
-            <span className="pdot" style={{ background: "#7b54ee" }} />Cordeiro
-          </button>
           <button className={moduleKey === "vedara" ? "on" : ""} onClick={() => setModuleKey("vedara")}>
-            <span className="pdot" style={{ background: "#0e9f93" }} />Vedara
+            <span className="pdot" style={{ background: "#0e9f93" }} />Vedara-O2C
           </button>
         </div>
         <span className="spacer" />
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={onUpload} />
-        {(moduleKey === "cordeiro" || moduleKey === "vedara") && (
-          <button className="btn" onClick={onRefresh} title="Recarregar os dados do banco">
-            <Icon name="loop" size={15} />Atualizar dados
-          </button>
-        )}
-        {moduleKey === "cordeiro" && (
-          <button className="btn primary" onClick={() => setShowQueries(true)} title="Editar as queries que alimentam o Cordeiro">
-            <Icon name="database" size={15} />Fonte de dados
-          </button>
-        )}
-        {(moduleKey === "p2p" || moduleKey === "o2c") && (
-          <>
-            <button className="btn" onClick={() => fileRef.current.click()}><Icon name="upload" size={15} />Importar CSV</button>
-            <button className="btn primary" onClick={() => { load(moduleKey, EMPTY_FILTERS); setFilters(EMPTY_FILTERS); flash("Dataset demo carregado"); }}>
-              <Icon name="database" size={15} />Carregar dataset demo
-            </button>
-          </>
-        )}
+        <button className="btn" onClick={onRefresh} title="Recarregar os dados do banco">
+          <Icon name="loop" size={15} />Atualizar dados
+        </button>
         <button className="icon-btn" onClick={() => setDark(d => !d)} title="Alternar tema">
           <Icon name={dark ? "sun" : "moon"} size={17} />
         </button>
@@ -384,7 +360,7 @@ export default function App() {
           <div className="file-card">
             <span className="fi"><Icon name="database" size={16} /></span>
             <div>
-              <div className="fn">demo_{moduleKey}_2026.csv</div>
+              <div className="fn">{data?.short || "Vedara-O2C"} · banco</div>
               <div className="fs">{data ? `${data.totalCases.toLocaleString("pt-BR")} casos` : "—"}</div>
             </div>
           </div>
