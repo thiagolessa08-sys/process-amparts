@@ -27,6 +27,12 @@ const SCREENS = [
 ];
 const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", dias: [], produto: "", activity: null, variantKeys: [], variantMode: "include" };
 
+const MODULES = [
+  { key: "vedara", label: "Veddara-O2C", color: "#0e9f93" },
+  { key: "biolab", label: "Biolab-P2P", color: "#e0820e" },
+  { key: "cordeiro", label: "Cordeiro-O2C", color: "#7b54ee" },
+];
+
 const ACT_MODE_LABEL = { with: "Com", without: "Sem", start: "Inicia em", end: "Termina em" };
 
 /* mini-gráfico do KPI */
@@ -203,7 +209,7 @@ function Toast({ msg }) {
 
 export default function App() {
   const [auth, setAuth]       = useState(() => readAuth());
-  const [moduleKey, setModuleKey] = useState("vedara");
+  const [moduleKey, setModuleKey] = useState(() => readAuth()?.modules?.[0] || "vedara");
   const [screen, setScreen]   = useState("explorer");
   const [dark, setDark]       = useTheme();
   const [drill, setDrill]     = useState(null);
@@ -298,12 +304,12 @@ export default function App() {
     assistant: { title: "Assistente IA", sub: <>Pergunte sobre o processo em linguagem natural</> },
   }[screen];
 
-  if (!auth) {
+  if (!auth || !auth.token) {   // sessão antiga sem token → força re-login
     return (
       <LoginScreen
         dark={dark}
         onToggleTheme={() => setDark((d) => !d)}
-        onLogin={(user) => setAuth(user)}
+        onLogin={(user) => { setAuth(user); setModuleKey(user.modules?.[0] || "vedara"); }}
       />
     );
   }
@@ -317,15 +323,11 @@ export default function App() {
           <span className="name">Fluxo<span className="dim">·mining</span></span>
         </div>
         <div className="tabs">
-          <button className={moduleKey === "vedara" ? "on" : ""} onClick={() => setModuleKey("vedara")}>
-            <span className="pdot" style={{ background: "#0e9f93" }} />Veddara-O2C
-          </button>
-          <button className={moduleKey === "biolab" ? "on" : ""} onClick={() => setModuleKey("biolab")}>
-            <span className="pdot" style={{ background: "#e0820e" }} />Biolab-P2P
-          </button>
-          <button className={moduleKey === "cordeiro" ? "on" : ""} onClick={() => setModuleKey("cordeiro")}>
-            <span className="pdot" style={{ background: "#7b54ee" }} />Cordeiro-O2C
-          </button>
+          {MODULES.filter((m) => (auth.modules || []).includes(m.key)).map((m) => (
+            <button key={m.key} className={moduleKey === m.key ? "on" : ""} onClick={() => setModuleKey(m.key)}>
+              <span className="pdot" style={{ background: m.color }} />{m.label}
+            </button>
+          ))}
         </div>
         <span className="spacer" />
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={onUpload} />

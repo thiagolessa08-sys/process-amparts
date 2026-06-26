@@ -8,10 +8,11 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")  # backend/.env
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Header
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app import auth
 from app import data_source
 from app import modules as module_registry
 from app.modules.cases import build_case_index, page_cases
@@ -232,7 +233,33 @@ def _reload_real(key: str):
     data_source.start_real_load(key)
 
 
-@app.get("/api/modules/{key}/status")
+# ── autenticação por usuário + acesso por módulo ─────────────────────────────
+class LoginBody(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/login")
+def login(body: LoginBody):
+    u = auth.verify_login(body.email, body.password)
+    if not u:
+        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
+    return auth.public_user(u)
+
+
+def require_module_access(key: str, authorization: Optional[str] = Header(default=None)):
+    """Dependency: exige token válido e que o módulo {key} esteja liberado."""
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    user = auth.user_from_token(token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    if key not in user.get("modules", []):
+        raise HTTPException(status_code=403, detail="Sem acesso a este módulo")
+
+
+@app.get("/api/modules/{key}/status", dependencies=[Depends(require_module_access)])
 def module_status(key: str):
     """Status de carga de uma fonte: ready | loading | error | idle + progresso %."""
     if not data_source.is_real(key):
@@ -244,7 +271,7 @@ def module_status(key: str):
     }
 
 
-@app.post("/api/modules/{key}/refresh")
+@app.post("/api/modules/{key}/refresh", dependencies=[Depends(require_module_access)])
 def refresh_module(key: str, x_admin_token: Optional[str] = Header(default=None)):
     """Descarta o cache da fonte real e recarrega do banco (sob demanda)."""
     if not data_source.is_real(key):
@@ -254,7 +281,7 @@ def refresh_module(key: str, x_admin_token: Optional[str] = Header(default=None)
     return {"ok": True, "status": data_source.real_status(key)}
 
 
-@app.get("/api/modules/{key}")
+@app.get("/api/modules/{key}", dependencies=[Depends(require_module_access)])
 def get_module(
     key: str,
     fornecedores: list[str] = Query(default=[]),
@@ -296,7 +323,7 @@ def get_module(
     return payload
 
 
-@app.get("/api/modules/{key}/cases")
+@app.get("/api/modules/{key}/cases", dependencies=[Depends(require_module_access)])
 def get_cases(
     key: str,
     fornecedores: list[str] = Query(default=[]),
@@ -355,7 +382,7 @@ def _detail_source(key: str):
     return None
 
 
-@app.get("/api/modules/{key}/details")
+@app.get("/api/modules/{key}/details", dependencies=[Depends(require_module_access)])
 def get_details(
     key: str,
     ano: Optional[int] = Query(default=None),
@@ -417,7 +444,7 @@ def ai_status():
     return {"configured": is_configured()}
 
 
-@app.post("/api/modules/{key}/ask")
+@app.post("/api/modules/{key}/ask", dependencies=[Depends(require_module_access)])
 def ask_module(
     key: str,
     body: AskBody,
@@ -451,7 +478,7 @@ def ask_module(
         raise HTTPException(status_code=502, detail=f"Falha ao consultar a IA: {exc}")
 
 
-@app.get("/api/modules/{key}/user/{name}")
+@app.get("/api/modules/{key}/user/{name}", dependencies=[Depends(require_module_access)])
 def get_user(
     key: str,
     name: str,

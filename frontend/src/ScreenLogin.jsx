@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Icon } from "./icons.jsx";
+import { login as apiLogin } from "./api.js";
 
 /* Autenticação só no frontend (demo). Credenciais de demonstração — em
    produção troque por um login real no backend (ver /api/login). */
@@ -31,7 +32,7 @@ export function LoginScreen({ onLogin, dark, onToggleTheme }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     setError("");
     if (!email.trim() || !pass) {
@@ -39,22 +40,14 @@ export function LoginScreen({ onLogin, dark, onToggleTheme }) {
       return;
     }
     setBusy(true);
-    // simula uma chamada de rede curta para dar feedback visual
-    setTimeout(() => {
-      const ok =
-        email.trim().toLowerCase() === DEMO_USER && pass === DEMO_PASS;
-      if (!ok) {
-        setBusy(false);
-        setError("E-mail ou senha incorretos.");
-        return;
-      }
-      const user = {
-        email: email.trim().toLowerCase(),
-        name: email.trim().split("@")[0],
-      };
+    try {
+      const user = await apiLogin(email.trim().toLowerCase(), pass);
       if (remember) saveAuth(user);
       onLogin(user);
-    }, 450);
+    } catch (err) {
+      setBusy(false);
+      setError(err.status === 401 ? "E-mail ou senha incorretos." : (err.message || "Falha no login."));
+    }
   }
 
   function fillDemo() {

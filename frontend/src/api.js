@@ -1,7 +1,29 @@
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+/* token do usuário logado (Authorization: Bearer) */
+function authHeaders(extra = {}) {
+  let token = "";
+  try { token = JSON.parse(localStorage.getItem("pm-auth") || "{}")?.token || ""; } catch { /* */ }
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+}
+
+export async function login(email, password) {
+  const res = await fetch(`${BASE}/api/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    const err = new Error(detail.detail || `Erro ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
 async function getJson(path) {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
     const err = new Error(detail.detail || `Erro ${res.status} em ${path}`);
@@ -72,7 +94,7 @@ export async function askAssistant(key, question, filters = {}) {
   const qs = filterParams(filters);
   const res = await fetch(`${BASE}/api/modules/${key}/ask${qs ? "?" + qs : ""}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ question }),
   });
   if (!res.ok) {
@@ -91,7 +113,7 @@ function adminHeaders(extra = {}) {
 async function sendJson(path, body, method = "POST") {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: adminHeaders(body ? { "Content-Type": "application/json" } : {}),
+    headers: authHeaders(adminHeaders(body ? { "Content-Type": "application/json" } : {})),
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
