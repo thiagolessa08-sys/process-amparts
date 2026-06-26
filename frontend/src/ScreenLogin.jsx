@@ -2,10 +2,7 @@ import { useState } from "react";
 import { Icon } from "./icons.jsx";
 import { login as apiLogin } from "./api.js";
 
-/* Autenticação só no frontend (demo). Credenciais de demonstração — em
-   produção troque por um login real no backend (ver /api/login). */
-const DEMO_USER = "admin@fluxo.com";
-const DEMO_PASS = "fluxo123";
+/* Login real contra o backend (POST /api/login) — ver app/auth.py. */
 
 /* Lê/escreve a sessão no localStorage para sobreviver a reloads. */
 const AUTH_KEY = "pm-auth";
@@ -50,11 +47,6 @@ export function LoginScreen({ onLogin, dark, onToggleTheme }) {
     }
   }
 
-  function fillDemo() {
-    setEmail(DEMO_USER);
-    setPass(DEMO_PASS);
-    setError("");
-  }
 
   return (
     <div className={"auth-shell" + (dark ? " dark" : "")}>
@@ -188,14 +180,6 @@ export function LoginScreen({ onLogin, dark, onToggleTheme }) {
               </>
             )}
           </button>
-
-          <button type="button" className="auth-demo" onClick={fillDemo}>
-            Usar credenciais de demonstração
-          </button>
-
-          <div className="auth-hint">
-            Demo: <b>{DEMO_USER}</b> / <b>{DEMO_PASS}</b>
-          </div>
         </form>
       </main>
     </div>
