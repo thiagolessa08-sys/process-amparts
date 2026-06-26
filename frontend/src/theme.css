@@ -555,7 +555,22 @@
   .det-table-wrap::-webkit-scrollbar { width: 9px; height: 9px; }
   .det-table-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
   .det-table { min-width: 1100px; }
-  .det-table tbody td { white-space: nowrap; }
+  /* cabeçalho roxo; texto à esquerda, números à direita; zebra p/ leitura */
+  .det-table thead th {
+    text-align: left; background: var(--violet); color: #fff;
+    font-weight: 700; padding: 10px 12px; border-bottom: none;
+  }
+  .det-table thead th.r { text-align: right; }
+  .det-table thead th:first-child { border-top-left-radius: 9px; border-bottom-left-radius: 9px; }
+  .det-table thead th:last-child { border-top-right-radius: 9px; border-bottom-right-radius: 9px; }
+  .det-table tbody td {
+    text-align: left; white-space: nowrap; padding: 8px 12px;
+    font-family: inherit; color: var(--ink-2);
+  }
+  .det-table tbody td.r { text-align: right; font-family: "JetBrains Mono", monospace; }
+  .det-table tbody td:first-child { font-weight: 600; color: var(--ink); }
+  .det-table tbody tr:nth-child(even) { background: var(--inset); }
+  .det-table tbody tr:hover { background: var(--hover); }
   /* Pedidos Pendentes: ~11 linhas visíveis (cabeçalho sticky) + rolagem */
   .tm-pend-wrap { flex: none; max-height: 421px; }
 
