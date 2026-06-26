@@ -277,6 +277,11 @@ export function UserProdScreen({ data, filters }) {
   const [tab, setTab] = useState("events");
   const [sel, setSel] = useState(null);
   const users = up.users || [];
+  // só os 50 maiores pela métrica ativa (evita centenas de bolhas poluindo)
+  const topUsers = useMemo(
+    () => [...users].sort((a, b) => (b[tab] || 0) - (a[tab] || 0)).slice(0, 50),
+    [users, tab]
+  );
 
   if (sel) return <UserDrill moduleKey={data.key} name={sel} filters={filters} onBack={() => setSel(null)} />;
 
@@ -297,6 +302,7 @@ export function UserProdScreen({ data, filters }) {
       <div className="panel">
         <div className="panel-head">
           <span className="pt">Usuários</span>
+          {users.length > 50 && <span className="ph-meta">top 50 de {fmtInt(users.length)}</span>}
           <span className="ph-spacer" />
           <div className="seg up-seg">
             <button className={tab === "events" ? "on" : ""} onClick={() => setTab("events")}>Eventos</button>
@@ -305,7 +311,7 @@ export function UserProdScreen({ data, filters }) {
         </div>
         <div className="panel-body">
           <div className="up-scale"><span>Poucos</span><i /><span>Muitos</span></div>
-          {users.length ? <Bubbles users={users} metric={tab} onSelect={setSel} /> : <div className="up-empty">Sem dados de usuário</div>}
+          {topUsers.length ? <Bubbles users={topUsers} metric={tab} onSelect={setSel} /> : <div className="up-empty">Sem dados de usuário</div>}
         </div>
       </div>
     </div>
