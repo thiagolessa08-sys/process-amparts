@@ -33,6 +33,23 @@ DETAIL_COLS = [
     {"key": "cancelado", "label": "Cancelado", "fmt": "text"},
 ]
 
+# painel de atributos do evento (clicar na atividade no Case Explorer)
+EVENT_ATTRS = [
+    {"label": "Atividade", "col": "activity"},
+    {"label": "Case Key", "col": "case_id"},
+    {"label": "Eventtime", "col": "timestamp", "fmt": "date"},
+    {"label": "Empresa", "col": "empresa"},
+    {"label": "Documento", "col": "documento"},
+    {"label": "Tipo Doc", "col": "tipo_doc"},
+    {"label": "Item", "col": "item"},
+    {"label": "Descrição", "col": "descricao"},
+    {"label": "Fornecedor", "col": "cliente"},
+    {"label": "Valor Anterior", "col": "changed_from"},
+    {"label": "Valor Novo", "col": "changed_to"},
+    {"label": "Usuário", "col": "resource"},
+    {"label": "Sorting", "col": "sort"},
+]
+
 _CASES_DETAIL: pd.DataFrame | None = None
 
 
@@ -57,7 +74,8 @@ def load_biolab_eventlog(conn: AgentConnector | None = None, progress=None) -> p
     progress(3)
 
     acts = conn.paginate_offset(
-        "_CASE_KEY, ACTIVITY_NAME, EVENTTIME, _SORTING, _USER_NAME",
+        "_CASE_KEY, ACTIVITY_NAME, EVENTTIME, _SORTING, _USER_NAME, "
+        "PDKCOO, PDDOCO, PDDCTO, PDLNID, _DESCRIPTION, CHANGED_FROM, CHANGED_TO",
         ACT_TABLE, order="_CASE_KEY, _SORTING, EVENTTIME",
         where=periodo,
         on_rows=lambda n: progress(3 + 78 * min(n, total) / total))
@@ -93,12 +111,23 @@ def load_biolab_eventlog(conn: AgentConnector | None = None, progress=None) -> p
     eventtime = pd.to_datetime(acts["EVENTTIME"], errors="coerce")
     sort = _num(acts["_SORTING"]).fillna(0)
 
+    def _txt(col):
+        return acts[col].astype(str).where(acts[col].notna(), None) if col in acts else None
+
     log = pd.DataFrame({
         "case_id": acts["_CASE_KEY"].astype(str),
         "activity": acts["ACTIVITY_NAME"].astype(str).str.strip(),
         "timestamp": eventtime + pd.to_timedelta(sort, unit="ms"),
         "sort": sort.astype("int64"),
         "resource": acts["_USER_NAME"].fillna("—"),
+        # atributos crus do evento (painel de detalhe no Case Explorer)
+        "empresa": _txt("PDKCOO"),
+        "documento": _txt("PDDOCO"),
+        "tipo_doc": _txt("PDDCTO"),
+        "item": _txt("PDLNID"),
+        "descricao": _txt("_DESCRIPTION"),
+        "changed_from": _txt("CHANGED_FROM"),
+        "changed_to": _txt("CHANGED_TO"),
     })
     log = log.dropna(subset=["timestamp"])
 

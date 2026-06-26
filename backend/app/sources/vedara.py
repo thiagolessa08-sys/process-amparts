@@ -29,6 +29,28 @@ DETAIL_COLS = [
     {"key": "valor", "label": "Valor Total", "fmt": "money"},
 ]
 
+# painel de atributos do evento (clicar na atividade no Case Explorer)
+EVENT_ATTRS = [
+    {"label": "Activity En", "col": "activity"},
+    {"label": "Case Key O2c", "col": "case_id"},
+    {"label": "Cliente", "col": "cliente"},
+    {"label": "Eventtime", "col": "eventtime_raw", "fmt": "date"},
+    {"label": "Fat Item", "col": "fat_item"},
+    {"label": "Fatura", "col": "fatura"},
+    {"label": "New Value Changed", "col": "new_value_changed"},
+    {"label": "Old Value Changed", "col": "old_value_changed"},
+    {"label": "Orc Item", "col": "orc_item"},
+    {"label": "Orcamento", "col": "orcamento"},
+    {"label": "Ped Item", "col": "ped_item"},
+    {"label": "Pedido", "col": "pedido"},
+    {"label": "Prod Nome", "col": "prod_nome"},
+    {"label": "Produto", "col": "produto_cod"},
+    {"label": "Sorting", "col": "sort"},
+    {"label": "Source Activity", "col": "source_activity"},
+    {"label": "Usuario", "col": "resource"},
+    {"label": "Vendedor", "col": "vendedor"},
+]
+
 # detalhe da SQL_PM_CASES (tela "Detalhes"), preenchido após a carga
 _CASES_DETAIL: pd.DataFrame | None = None
 

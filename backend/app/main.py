@@ -336,7 +336,9 @@ def get_cases(
             _CASES_CACHE.clear()
         _CASES_CACHE[sig] = idx
     sorted_log, summary = idx
-    return page_cases(sorted_log, summary, q=q, limit=limit)
+    src = _detail_source(key)
+    event_attrs = getattr(src, "EVENT_ATTRS", None) if src else None
+    return page_cases(sorted_log, summary, q=q, limit=limit, event_attrs=event_attrs)
 
 
 def _detail_source(key: str):

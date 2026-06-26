@@ -37,9 +37,20 @@ def build_case_index(log: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return log, summary
 
 
+def _cell(x):
+    if x is None or (not isinstance(x, str) and pd.isna(x)):
+        return "—"
+    s = str(x).strip()
+    return s if s and s.lower() != "nan" else "—"
+
+
 def page_cases(sorted_log: pd.DataFrame, summary: pd.DataFrame,
-               q: str | None = None, limit: int = 500) -> dict:
+               q: str | None = None, limit: int = 500, event_attrs=None) -> dict:
     """Filtra por Case Id (substring), pagina e monta a timeline só da página.
+
+    `event_attrs`: lista opcional de {label, col, fmt?} para o painel de detalhe
+    do evento ao clicar na atividade. `col` é uma coluna do event log (ou
+    'case_id'/'activity'); fmt='date' formata como AAAA-MM-DD.
 
     Retorna {"cases": [...], "total": <após busca>}.
     """
@@ -52,37 +63,26 @@ def page_cases(sorted_log: pd.DataFrame, summary: pd.DataFrame,
     page_ids = ids[: max(0, limit)]
     sub = sorted_log[sorted_log[CASE_ID].isin(set(page_ids))]
 
-    # painel de detalhe por evento (Vedara): só quando as colunas crus existem
-    has_attrs = "source_activity" in sorted_log.columns
+    # painel de detalhe por evento: só os campos cujas colunas existem no log
+    specs = [s for s in (event_attrs or [])
+             if s["col"] in ("case_id", "activity") or s["col"] in sorted_log.columns]
+    has_attrs = bool(specs)
 
-    def _v(x):
-        if x is None or (not isinstance(x, str) and pd.isna(x)):
-            return "—"
-        s = str(x).strip()
-        return s if s and s.lower() != "nan" else "—"
-
-    def _event_attrs(cid, a, r):
-        et = r.get("eventtime_raw")
-        return {
-            "Activity En": _v(a),
-            "Case Key O2c": _v(cid),
-            "Cliente": _v(r.get("cliente")),
-            "Eventtime": (pd.to_datetime(et).strftime("%Y-%m-%d") if et is not None and not pd.isna(et) else "—"),
-            "Fat Item": _v(r.get("fat_item")),
-            "Fatura": _v(r.get("fatura")),
-            "New Value Changed": _v(r.get("new_value_changed")),
-            "Old Value Changed": _v(r.get("old_value_changed")),
-            "Orc Item": _v(r.get("orc_item")),
-            "Orcamento": _v(r.get("orcamento")),
-            "Ped Item": _v(r.get("ped_item")),
-            "Pedido": _v(r.get("pedido")),
-            "Prod Nome": _v(r.get("prod_nome")),
-            "Produto": _v(r.get("produto_cod")),
-            "Sorting": _v(r.get("sort")),
-            "Source Activity": _v(r.get("source_activity")),
-            "Usuario": _v(r.get("resource")),
-            "Vendedor": _v(r.get("vendedor")),
-        }
+    def _build_attrs(cid, a, r):
+        out = {}
+        for s in specs:
+            col = s["col"]
+            if col == "case_id":
+                out[s["label"]] = _cell(cid)
+            elif col == "activity":
+                out[s["label"]] = _cell(a)
+            elif s.get("fmt") == "date":
+                x = r.get(col)
+                out[s["label"]] = (pd.to_datetime(x).strftime("%Y-%m-%d")
+                                   if x is not None and not pd.isna(x) else "—")
+            else:
+                out[s["label"]] = _cell(r.get(col))
+        return out
 
     timelines: dict[str, list] = {}
     for cid, g in sub.groupby(CASE_ID, sort=False):
@@ -94,7 +94,7 @@ def page_cases(sorted_log: pd.DataFrame, summary: pd.DataFrame,
             delta = (t - prev).total_seconds() if prev is not None else None
             ev = {"label": a, "ts": t.isoformat(), "deltaSeconds": delta}
             if has_attrs:
-                ev["attrs"] = _event_attrs(cid, a, recs[idx])
+                ev["attrs"] = _build_attrs(cid, a, recs[idx])
             tl.append(ev)
             prev = t
         timelines[str(cid)] = tl
