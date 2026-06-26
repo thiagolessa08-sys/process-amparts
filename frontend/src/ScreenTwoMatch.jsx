@@ -21,13 +21,13 @@ function niceMax(v) {
 
 /* ───────── 1. Pedidos × Faturamento (barras agrupadas) ───────── */
 function GroupedBars({ data }) {
-  const W = 720, H = 240, padL = 46, padB = 30, padT = 16, padR = 8;
+  const W = 720, H = 360, padL = 46, padB = 30, padT = 16, padR = 8;
   const cw = W - padL - padR, ch = H - padT - padB;
   const max = niceMax(Math.max(1, ...data.flatMap((d) => [d.pedidoValor, d.faturadoValor])));
   const n = Math.max(1, data.length), group = cw / n, bw = Math.min(15, group / 3);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => t * max);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="tm-svg">
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="tm-svg">
       {ticks.map((t, i) => {
         const y = padT + ch - (t / max) * ch;
         return <g key={i}>
@@ -50,11 +50,11 @@ function GroupedBars({ data }) {
 
 /* ───────── 2. % de pedidos efetivados (barras + rótulo) ───────── */
 function PctBars({ data }) {
-  const W = 720, H = 240, padL = 36, padB = 30, padT = 26, padR = 8;
+  const W = 720, H = 360, padL = 36, padB = 30, padT = 26, padR = 8;
   const cw = W - padL - padR, ch = H - padT - padB;
   const n = Math.max(1, data.length), group = cw / n, bw = Math.min(34, group * 0.6);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="tm-svg">
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="tm-svg">
       <line x1={padL} x2={W - padR} y1={padT + ch} y2={padT + ch} className="tm-grid" />
       {data.map((d, i) => {
         const gx = padL + i * group + group / 2;
@@ -71,7 +71,7 @@ function PctBars({ data }) {
 
 /* ───────── 3. Evolução Faturamento (barras + linha, eixo duplo) ───────── */
 function ComboChart({ data }) {
-  const W = 720, H = 240, padL = 46, padB = 30, padT = 16, padR = 44;
+  const W = 720, H = 360, padL = 46, padB = 30, padT = 16, padR = 44;
   const cw = W - padL - padR, ch = H - padT - padB;
   const maxV = niceMax(Math.max(1, ...data.map((d) => d.faturadoValor)));
   const maxC = niceMax(Math.max(1, ...data.map((d) => d.faturadoCount)));
@@ -83,7 +83,7 @@ function ComboChart({ data }) {
     return [gx, y];
   });
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="tm-svg">
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="tm-svg">
       {ticks.map((t, i) => {
         const y = padT + ch - t * ch;
         return <g key={i}>
