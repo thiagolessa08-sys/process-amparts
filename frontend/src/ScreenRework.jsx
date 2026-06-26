@@ -180,6 +180,15 @@ export function ReworkScreen({ data }) {
         </div>
       </div>
       <div className="rwk-col">
+        <div className="rwk-kpi">
+          <span className="rwk-kpi-ic"><Icon name="loop" size={20} /></span>
+          <div className="rwk-kpi-txt">
+            <div className="rwk-kpi-label">Retrabalho geral</div>
+            <div className="rwk-kpi-desc">% de casos com ao menos uma atividade de retrabalho</div>
+          </div>
+          <span className="rwk-kpi-spacer" />
+          <div className="rwk-kpi-value">{fmtPct(rw.pctComRetrabalho ?? 0)}</div>
+        </div>
         <AtividadesPanel rows={rw.atividades} />
         <div className="rwk-bottom">
           <ComSemPanel rows={rw.comSem} />
