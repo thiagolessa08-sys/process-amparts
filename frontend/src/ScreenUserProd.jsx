@@ -62,7 +62,7 @@ function packBubbles(users, metric, W, H) {
   const vals = users.map((u) => Math.max(0.001, u[metric]));
   const min = Math.min(...vals), max = Math.max(...vals);
   const sMin = Math.sqrt(min), sMax = Math.sqrt(max);
-  const rMin = 16, rMax = 54;
+  const rMin = 26, rMax = 86;
   const items = users.map((u) => {
     const v = Math.max(0.001, u[metric]);
     const t = sMax > sMin ? (Math.sqrt(v) - sMin) / (sMax - sMin) : 0.5;
@@ -72,10 +72,10 @@ function packBubbles(users, metric, W, H) {
   for (const it of items) {
     if (!placed.length) { placed.push({ ...it, x: cx, y: cy }); continue; }
     let pos = null;
-    for (let a = 0; a < 8000; a++) {
-      const ang = a * 0.35, rad = 2 + a * 0.45;
+    for (let a = 0; a < 12000; a++) {
+      const ang = a * 0.3, rad = 2 + a * 0.55;
       const x = cx + rad * Math.cos(ang), y = cy + rad * Math.sin(ang);
-      if (placed.every((p) => Math.hypot(p.x - x, p.y - y) >= p.r + it.r + 2)) { pos = { x, y }; break; }
+      if (placed.every((p) => Math.hypot(p.x - x, p.y - y) >= p.r + it.r + 4)) { pos = { x, y }; break; }
     }
     placed.push({ ...it, x: (pos || { x: cx, y: cy }).x, y: (pos || { x: cx, y: cy }).y });
   }
@@ -83,19 +83,33 @@ function packBubbles(users, metric, W, H) {
 }
 
 function Bubbles({ users, metric, onSelect }) {
-  const W = 1180, H = 540;
+  const W = 1180, H = 580;
   const placed = useMemo(() => packBubbles(users, metric, W, H), [users, metric]);
   const fmtV = (b) => metric === "throughput" ? `${b.v.toFixed(1)}d` : fmtInt(b.events);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="up-bubbles">
+      <defs>
+        <filter id="bubShadow" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor="#5b6b9e" floodOpacity="0.30" />
+        </filter>
+        <radialGradient id="bubGloss" cx="35%" cy="26%" r="78%">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.5" />
+          <stop offset="0.45" stopColor="#fff" stopOpacity="0.08" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
       {placed.map((b) => (
         <g key={b.user} transform={`translate(${b.x.toFixed(1)},${b.y.toFixed(1)})`}
           className="up-bub" onClick={() => onSelect?.(b.user)}>
-          <circle r={b.r} fill={bubbleColor(b.t)} fillOpacity="0.92">
-            <title>{b.user}: {metric === "throughput" ? `${b.v.toFixed(1)} dias` : `${fmtInt(b.events)} eventos`}</title>
-          </circle>
-          {b.r >= 30 && <text y={-2} className="up-bub-name" textAnchor="middle">{b.user.length > 16 ? b.user.slice(0, 15) + "…" : b.user}</text>}
-          <text y={b.r >= 30 ? 13 : 4} className="up-bub-val" textAnchor="middle" style={{ fontSize: Math.max(9, Math.min(15, b.r * 0.42)) }}>{fmtV(b)}</text>
+          <title>{b.user}: {metric === "throughput" ? `${b.v.toFixed(1)} dias` : `${fmtInt(b.events)} eventos`}</title>
+          <circle className="up-bub-fill" r={b.r} fill={bubbleColor(b.t)} filter="url(#bubShadow)" />
+          <circle r={b.r} fill="url(#bubGloss)" pointerEvents="none" />
+          <circle r={b.r} fill="none" stroke="#fff" strokeOpacity="0.6" strokeWidth="1.5" pointerEvents="none" />
+          {b.r >= 30 && <text y={-3} className="up-bub-name" textAnchor="middle"
+            style={{ fontSize: Math.max(8.5, Math.min(12.5, b.r * 0.24)) }}>
+            {b.user.length > 16 ? b.user.slice(0, 15) + "…" : b.user}</text>}
+          <text y={b.r >= 30 ? 14 : 4} className="up-bub-val" textAnchor="middle"
+            style={{ fontSize: Math.max(10, Math.min(19, b.r * 0.4)) }}>{fmtV(b)}</text>
         </g>
       ))}
     </svg>
@@ -277,10 +291,15 @@ export function UserProdScreen({ data, filters }) {
   const [tab, setTab] = useState("events");
   const [sel, setSel] = useState(null);
   const users = up.users || [];
-  // só os 50 maiores pela métrica ativa (evita centenas de bolhas poluindo)
+  // só os 30 maiores pela métrica ativa (evita centenas de bolhas poluindo)
   const topUsers = useMemo(
-    () => [...users].sort((a, b) => (b[tab] || 0) - (a[tab] || 0)).slice(0, 50),
+    () => [...users].sort((a, b) => (b[tab] || 0) - (a[tab] || 0)).slice(0, 30),
     [users, tab]
+  );
+  // todos os usuários (ordem alfabética) para o seletor — ver alguém além dos 30
+  const allUsers = useMemo(
+    () => [...users].sort((a, b) => a.user.localeCompare(b.user)),
+    [users]
   );
 
   if (sel) return <UserDrill moduleKey={data.key} name={sel} filters={filters} onBack={() => setSel(null)} />;
@@ -302,8 +321,16 @@ export function UserProdScreen({ data, filters }) {
       <div className="panel">
         <div className="panel-head">
           <span className="pt">Usuários</span>
-          {users.length > 50 && <span className="ph-meta">top 50 de {fmtInt(users.length)}</span>}
+          {users.length > 30 && <span className="ph-meta">top 30 de {fmtInt(users.length)}</span>}
           <span className="ph-spacer" />
+          <div className="selectwrap up-userpick">
+            <span className="lead"><Icon name="search" size={14} /></span>
+            <select value="" onChange={(e) => e.target.value && setSel(e.target.value)}>
+              <option value="">Ver usuário…</option>
+              {allUsers.map((u) => <option key={u.user} value={u.user}>{u.user}</option>)}
+            </select>
+            <span className="caret"><Icon name="chevronD" size={14} /></span>
+          </div>
           <div className="seg up-seg">
             <button className={tab === "events" ? "on" : ""} onClick={() => setTab("events")}>Eventos</button>
             <button className={tab === "throughput" ? "on" : ""} onClick={() => setTab("throughput")}>Throughput</button>

@@ -855,12 +855,16 @@
   .up-seg.seg { box-shadow: none; }
   .up-scale { display: flex; align-items: center; gap: 8px; justify-content: flex-end; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
   .up-scale i { width: 120px; height: 6px; border-radius: 4px; background: linear-gradient(90deg, #a9c2e3, #c39bbf, #e0617c); }
-  .up-bubbles { width: 100%; height: auto; display: block; }
-  .up-bub-name { font-size: 9.5px; font-weight: 600; fill: #fff; pointer-events: none; }
-  .up-bub-val { font-weight: 700; fill: #fff; pointer-events: none; font-family: "JetBrains Mono", monospace; }
+  .up-bubbles { width: 100%; height: auto; display: block; overflow: visible; }
+  .up-bub-name { font-weight: 700; fill: #fff; pointer-events: none; letter-spacing: .01em;
+    paint-order: stroke; stroke: rgba(40,30,70,.28); stroke-width: 2.4px; stroke-linejoin: round; }
+  .up-bub-val { font-weight: 800; fill: #fff; pointer-events: none; font-family: "JetBrains Mono", monospace;
+    paint-order: stroke; stroke: rgba(40,30,70,.30); stroke-width: 2.6px; stroke-linejoin: round; }
   .up-bub { cursor: pointer; }
-  .up-bub circle { transition: fill-opacity .12s ease; }
-  .up-bub:hover circle { fill-opacity: 1; stroke: var(--violet); stroke-width: 2; }
+  .up-bub-fill { transition: transform .14s cubic-bezier(.2,.7,.3,1); transform-origin: center; }
+  .up-bub:hover .up-bub-fill { transform: scale(1.07); }
+  .up-userpick { width: 168px; }
+  .up-userpick select { font-size: 12.5px; }
 
   /* drill de usuário */
   .up-back {
