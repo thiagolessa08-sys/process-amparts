@@ -349,6 +349,9 @@ def _detail_source(key: str):
     if key == "biolab":
         from app.sources import biolab as src
         return src
+    if key == "cordeiro":
+        from app.sources import cordeiro as src
+        return src
     return None
 
 

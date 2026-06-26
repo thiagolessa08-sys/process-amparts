@@ -323,6 +323,9 @@ export default function App() {
           <button className={moduleKey === "biolab" ? "on" : ""} onClick={() => setModuleKey("biolab")}>
             <span className="pdot" style={{ background: "#e0820e" }} />Biolab-P2P
           </button>
+          <button className={moduleKey === "cordeiro" ? "on" : ""} onClick={() => setModuleKey("cordeiro")}>
+            <span className="pdot" style={{ background: "#7b54ee" }} />Cordeiro-O2C
+          </button>
         </div>
         <span className="spacer" />
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={onUpload} />

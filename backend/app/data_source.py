@@ -15,6 +15,7 @@ from app.connectors.csv_connector import CSVConnector
 REAL_LOADERS = {
     "vedara": ("app.sources.vedara", "load_vedara_eventlog"),
     "biolab": ("app.sources.biolab", "load_biolab_eventlog"),
+    "cordeiro": ("app.sources.cordeiro", "load_cordeiro_eventlog"),
 }
 
 _state = {"path": None}                       # override manual (upload)

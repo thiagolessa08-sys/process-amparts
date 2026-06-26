@@ -31,7 +31,9 @@ export function DetailsScreen({ data, filters }) {
   const total = res?.total ?? 0;
   const capped = total > rows.length;
   const fmtCell = (fmt, v) => v == null ? "—"
-    : fmt === "money" ? fmtVal(v) : fmt === "int" ? fmtInt(v) : String(v);
+    : fmt === "money" ? fmtVal(v) : fmt === "int" ? fmtInt(v)
+    : fmt === "id" ? (v !== "" && !isNaN(v) ? String(Number(v)) : String(v))
+    : String(v);
 
   return (
     <div className="details">

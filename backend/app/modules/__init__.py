@@ -18,5 +18,7 @@ def all_keys() -> list[str]:
 # auto-registro dos módulos disponíveis
 from app.modules.vedara_module import VedaraModule  # noqa: E402
 from app.modules.biolab_module import BiolabModule  # noqa: E402
+from app.modules.cordeiro_module import CordeiroModule  # noqa: E402
 register(VedaraModule())
 register(BiolabModule())
+register(CordeiroModule())
