@@ -861,8 +861,9 @@
   .up-bub-val { font-weight: 800; fill: #fff; pointer-events: none; font-family: "JetBrains Mono", monospace;
     paint-order: stroke; stroke: rgba(40,30,70,.30); stroke-width: 2.6px; stroke-linejoin: round; }
   .up-bub { cursor: pointer; }
-  .up-bub-fill { transition: transform .14s cubic-bezier(.2,.7,.3,1); transform-origin: center; }
-  .up-bub:hover .up-bub-fill { transform: scale(1.07); }
+  /* escala os 3 círculos (cor + brilho + borda) juntos, p/ a cor não vazar da borda */
+  .up-bub circle { transition: transform .14s cubic-bezier(.2,.7,.3,1); transform-box: fill-box; transform-origin: center; }
+  .up-bub:hover circle { transform: scale(1.07); }
   .up-userpick { width: 168px; }
   .up-userpick select { font-size: 12.5px; }
 
