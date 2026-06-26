@@ -127,6 +127,7 @@ function MonthlyArea({ data, legend }) {
   if (!data.length) return <div className="up-empty">Sem dados</div>;
 
   const valOf = (d, a) => d.acts ? (d.acts[a] || 0) : d.events;
+  const labelStep = Math.max(1, Math.ceil(data.length / 12));   // ~12 rótulos no eixo X
   const max = Math.max(5, ...data.map((d) => d.events));
   const xs = (i) => padL + (data.length === 1 ? cw / 2 : (i / (data.length - 1)) * cw);
   const ys = (v) => padT + ch - (v / max) * ch;
@@ -152,7 +153,7 @@ function MonthlyArea({ data, legend }) {
         <svg viewBox={`0 0 ${W} ${H}`} className="up-area-svg">
           {ticks.map((t, i) => { const y = ys(t); return <g key={i}><line x1={padL} x2={W - padR} y1={y} y2={y} className="tm-grid" /><text x={padL - 6} y={y + 3} className="tm-axis" textAnchor="end">{t}</text></g>; })}
           {bands.map((b) => <path key={b.a} d={b.d} fill={colorOf(b.a)} fillOpacity="0.88" />)}
-          {data.map((d, i) => (i % 3 === 0 || i === data.length - 1) && <text key={"t" + i} x={xs(i)} y={H - 12} className="tm-axis" textAnchor="middle">{d.mes}</text>)}
+          {data.map((d, i) => (i % labelStep === 0 || i === data.length - 1) && <text key={"t" + i} x={xs(i)} y={H - 12} className="tm-axis" textAnchor="middle">{d.mes}</text>)}
           {data.map((d, i) => {
             const w = data.length > 1 ? cw / (data.length - 1) : cw;
             return <rect key={"h" + i} x={xs(i) - w / 2} y={padT} width={w} height={ch} fill="transparent"
@@ -235,6 +236,7 @@ function DailyProfile({ data, legend }) {
 function UserDrill({ moduleKey, name, filters, onBack }) {
   const [d, setD] = useState(null);
   const [err, setErr] = useState(null);
+  const [grain, setGrain] = useState("mes");   // série de atividades: mês ou dia
   useEffect(() => {
     let alive = true;
     setD(null); setErr(null);
@@ -272,8 +274,15 @@ function UserDrill({ moduleKey, name, filters, onBack }) {
           </div>
 
           <div className="panel">
-            <div className="panel-head"><span className="pt"><b>{name}</b> — atividades por mês</span></div>
-            <div className="panel-body"><MonthlyArea data={d.monthly} legend={d.dailyLegend} /></div>
+            <div className="panel-head">
+              <span className="pt"><b>{name}</b> — atividades por {grain === "mes" ? "mês" : "dia"}</span>
+              <span className="ph-spacer" />
+              <div className="seg up-seg">
+                <button className={grain === "mes" ? "on" : ""} onClick={() => setGrain("mes")}>Mês</button>
+                <button className={grain === "dia" ? "on" : ""} onClick={() => setGrain("dia")}>Dia</button>
+              </div>
+            </div>
+            <div className="panel-body"><MonthlyArea data={grain === "mes" ? d.monthly : (d.byDay || [])} legend={d.dailyLegend} /></div>
           </div>
 
           <div className="panel">

@@ -101,14 +101,19 @@ def user_detail(log: pd.DataFrame, name: str) -> dict:
     has_other = (ua["_a"] == "Outras").any()
     legend = [str(a) for a in top_acts] + (["Outras"] if has_other else [])
 
-    # série mensal empilhada por atividade (estilo Celonis)
-    mp = (ua.assign(_m=u[TIMESTAMP].dt.strftime("%Y-%m"))
-            .groupby(["_m", "_a"]).size().unstack(fill_value=0))
-    monthly = []
-    for m in mp.index:
-        row = mp.loc[m]
-        acts = {a: int(row.get(a, 0)) for a in legend}
-        monthly.append({"mes": m, "events": int(sum(acts.values())), "acts": acts})
+    # série empilhada por atividade (estilo Celonis), por mês e por dia
+    def _series(fmt):
+        piv = (ua.assign(_k=u[TIMESTAMP].dt.strftime(fmt))
+                 .groupby(["_k", "_a"]).size().unstack(fill_value=0))
+        out = []
+        for k in piv.index:
+            row = piv.loc[k]
+            acts = {a: int(row.get(a, 0)) for a in legend}
+            out.append({"mes": k, "events": int(sum(acts.values())), "acts": acts})
+        return out
+
+    monthly = _series("%Y-%m")
+    by_day = _series("%Y-%m-%d")
 
     # perfil diário empilhado por atividade (estilo Celonis): top N atividades
     # + "Outras", com contagem por faixa de 2h.
@@ -130,6 +135,7 @@ def user_detail(log: pd.DataFrame, name: str) -> dict:
         "comeFrom": {"names": [str(x) for x in tc.index], "pct": pc},
         "goesTo": {"names": [str(x) for x in tg.index], "pct": pg},
         "monthly": monthly,
+        "byDay": by_day,
         "dailyProfile": daily,
         "dailyLegend": legend,
     }
