@@ -5,7 +5,7 @@ import { fetchDetails } from "./api.js";
 const PAGE_LIMIT = 500;
 const fmtInt = (n) => (Number(n) || 0).toLocaleString("pt-BR");
 const fmtVal = (n) => (Number(n) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const NUM = new Set(["nrPed", "nrOrc", "itemOrc", "nrNf", "qtde", "valor"]);
+const isNum = (fmt) => fmt === "money" || fmt === "int" || fmt === "id";
 
 export function DetailsScreen({ data, filters }) {
   const [res, setRes] = useState(null);
@@ -30,8 +30,8 @@ export function DetailsScreen({ data, filters }) {
   const rows = res?.rows || [];
   const total = res?.total ?? 0;
   const capped = total > rows.length;
-  const fmtCell = (k, v) => v == null ? "—"
-    : k === "valor" ? fmtVal(v) : k === "qtde" ? fmtInt(v) : String(v);
+  const fmtCell = (fmt, v) => v == null ? "—"
+    : fmt === "money" ? fmtVal(v) : fmt === "int" ? fmtInt(v) : String(v);
 
   return (
     <div className="details">
@@ -49,13 +49,13 @@ export function DetailsScreen({ data, filters }) {
       <div className="det-table-wrap">
         <table className="nf-table det-table">
           <thead>
-            <tr>{cols.map((c) => <th key={c.key} className={NUM.has(c.key) ? "r" : ""}>{c.label}</th>)}</tr>
+            <tr>{cols.map((c) => <th key={c.key} className={isNum(c.fmt) ? "r" : ""}>{c.label}</th>)}</tr>
           </thead>
           <tbody>
             {rows.map((row, i) => (
               <tr key={i}>
                 {cols.map((c) => (
-                  <td key={c.key} className={NUM.has(c.key) ? "r mono" : ""}>{fmtCell(c.key, row[c.key])}</td>
+                  <td key={c.key} className={isNum(c.fmt) ? "r mono" : ""}>{fmtCell(c.fmt, row[c.key])}</td>
                 ))}
               </tr>
             ))}

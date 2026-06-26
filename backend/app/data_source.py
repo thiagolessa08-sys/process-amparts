@@ -14,6 +14,7 @@ from app.connectors.csv_connector import CSVConnector
 # fontes reais (banco via agent): módulo:função do loader
 REAL_LOADERS = {
     "vedara": ("app.sources.vedara", "load_vedara_eventlog"),
+    "biolab": ("app.sources.biolab", "load_biolab_eventlog"),
 }
 
 _state = {"path": None}                       # override manual (upload)

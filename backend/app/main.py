@@ -48,8 +48,8 @@ def _prewarm():
     para o usuário não esperar no primeiro clique. Silencioso se o agent estiver fora."""
     if os.environ.get("CORDEIRO_PREWARM", "1") != "1":
         return
-    # apenas o Vedara-O2C é exposto; não pré-aquecer outras fontes
-    data_source.start_real_load("vedara")
+    for key in data_source.REAL_LOADERS:
+        data_source.start_real_load(key)
 
 
 def _apply_filters(
@@ -339,13 +339,15 @@ def get_cases(
     return page_cases(sorted_log, summary, q=q, limit=limit)
 
 
-_DETAIL_COLS = [
-    {"key": "nrPed", "label": "Nr. PED"}, {"key": "data", "label": "Data"},
-    {"key": "nrOrc", "label": "Nr. ORC"}, {"key": "itemOrc", "label": "Item ORC"},
-    {"key": "nrNf", "label": "Nr. NF"}, {"key": "cliente", "label": "Cliente"},
-    {"key": "produto", "label": "Produto"}, {"key": "qtde", "label": "Qtde Itens"},
-    {"key": "valor", "label": "Valor Total"},
-]
+def _detail_source(key: str):
+    """Fonte da tela Detalhes por módulo (expõe DETAIL_COLS + get_cases_detail)."""
+    if key == "vedara":
+        from app.sources import vedara as src
+        return src
+    if key == "biolab":
+        from app.sources import biolab as src
+        return src
+    return None
 
 
 @app.get("/api/modules/{key}/details")
@@ -359,38 +361,45 @@ def get_details(
     limit: int = Query(default=500),
     offset: int = Query(default=0),
 ):
-    """Detalhe da SQL_PM_CASES (uma linha por caso) — tela Detalhes."""
+    """Detalhe por caso/item (tela Detalhes), por módulo."""
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
     _guard_real(key)
-    from app.sources import vedara as vedara_src
-    df = vedara_src.get_cases_detail()
+    src = _detail_source(key)
+    cols = getattr(src, "DETAIL_COLS", []) if src else []
+    df = src.get_cases_detail() if src else pd.DataFrame()
     if df.empty:
-        return {"rows": [], "total": 0, "columns": _DETAIL_COLS}
+        return {"rows": [], "total": 0, "columns": cols}
 
     df = df.copy()
-    dt = pd.to_datetime(df["data"], errors="coerce")
     mask = pd.Series(True, index=df.index)
-    if ano:
-        mask &= (dt.dt.year == ano)
-    if mes:
-        mask &= (dt.dt.month == mes)
-    if dias:
-        mask &= dt.dt.day.isin(dias)
-    if produto:
+    if (ano or mes or dias) and "data" in df.columns:
+        dt = pd.to_datetime(df["data"], errors="coerce")
+        if ano:
+            mask &= (dt.dt.year == ano)
+        if mes:
+            mask &= (dt.dt.month == mes)
+        if dias:
+            mask &= dt.dt.day.isin(dias)
+    if produto and "produto" in df.columns:
         mask &= (df["produto"].astype(str) == produto)
     if q and q.strip():
         ql = q.strip().lower()
-        hay = (df["nrPed"].astype(str) + " " + df["cliente"].astype(str) + " "
-               + df["produto"].astype(str)).str.lower()
-        mask &= hay.str.contains(ql, regex=False, na=False)
+        text_cols = [c["key"] for c in cols if c.get("fmt") in (None, "text", "id")]
+        hay = None
+        for c in text_cols:
+            if c in df.columns:
+                s = df[c].astype(str).str.lower()
+                hay = s if hay is None else (hay + " " + s)
+        if hay is not None:
+            mask &= hay.str.contains(ql, regex=False, na=False)
     df = df[mask]
 
     total = int(len(df))
     page = df.iloc[offset: offset + max(0, limit)]
     rows = json.loads(page.to_json(orient="records"))
-    return {"rows": rows, "total": total, "columns": _DETAIL_COLS}
+    return {"rows": rows, "total": total, "columns": cols}
 
 
 class AskBody(BaseModel):

@@ -16,6 +16,19 @@ CASE_TABLE = f"{SCHEMA}.SQL_PM_CASES"
 # recorte do período: só eventos a partir de 2024
 DESDE = "2024-01-01"
 
+# colunas da tela Detalhes (a partir da SQL_PM_CASES)
+DETAIL_COLS = [
+    {"key": "nrPed", "label": "Nr. PED", "fmt": "id"},
+    {"key": "data", "label": "Data", "fmt": "text"},
+    {"key": "nrOrc", "label": "Nr. ORC", "fmt": "id"},
+    {"key": "itemOrc", "label": "Item ORC", "fmt": "id"},
+    {"key": "nrNf", "label": "Nr. NF", "fmt": "id"},
+    {"key": "cliente", "label": "Cliente", "fmt": "text"},
+    {"key": "produto", "label": "Produto", "fmt": "text"},
+    {"key": "qtde", "label": "Qtde Itens", "fmt": "int"},
+    {"key": "valor", "label": "Valor Total", "fmt": "money"},
+]
+
 # detalhe da SQL_PM_CASES (tela "Detalhes"), preenchido após a carga
 _CASES_DETAIL: pd.DataFrame | None = None
 
