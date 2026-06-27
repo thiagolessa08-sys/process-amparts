@@ -596,7 +596,14 @@
   .rwk-legend .lchip { font-size: 12.5px; }
 
   /* célula de % com barra vermelha (Retrabalho por cliente) */
-  .rwk-table tbody td:last-child { width: 132px; padding: 6px 10px; }
+  /* tabela de 4 colunas num painel estreito: cabe sem rolar (sem o min-width 720 do .nf-table) */
+  .rwk-table { min-width: 0; table-layout: fixed; }
+  /* Cliente (1ª col) fica com o restante; numéricas estreitas; % fixa */
+  .rwk-table thead th:nth-child(2), .rwk-table thead th:nth-child(3),
+  .rwk-table tbody td:nth-child(2), .rwk-table tbody td:nth-child(3) { width: 86px; }
+  .rwk-table tbody td:last-child,
+  .rwk-table thead th:last-child { width: 120px; padding: 6px 10px; }
+  .rwk-table tbody td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rwk-pct-cell { position: relative; display: block; border-radius: 6px; overflow: hidden; background: var(--red-soft); }
   .rwk-pct-bar { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #ef5e62, #e5484d); }
   .rwk-pct-val { position: relative; z-index: 1; display: block; text-align: right; padding: 4px 9px; font-weight: 700; color: var(--red); }
