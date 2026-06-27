@@ -55,14 +55,14 @@ function AtividadesPanel({ rows = [] }) {
         <div className="nf-wrap">
           <table className="nf-table">
             <thead>
-              <tr><th>Atividade</th><th># Itens</th><th># Atividade</th></tr>
+              <tr><th>Atividade</th><th># Itens</th><th>Valor</th></tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.atividade}>
                   <td>{r.atividade}</td>
                   <td>{fmtInt(r.itens)}</td>
-                  <td className="accent">{fmtInt(r.ocorrencias)}</td>
+                  <td className="accent">{fmtMoney(r.valor)}</td>
                 </tr>
               ))}
             </tbody>

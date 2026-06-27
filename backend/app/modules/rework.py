@@ -53,24 +53,26 @@ def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = N
         rework_cases = set().union(*act_cases.values()) if act_cases else set()
 
     total = len(seqs)
+    valor_by_case = first["valor"] if has("valor") else None
 
     # ── atividades de retrabalho ─────────────────────────────────────────────
-    # itens = nº de itens (casos) distintos afetados pela atividade — NÃO o valor:
-    # o event log não traz quantidade de itens, então usar `first["itens"]` caía
-    # num fallback igual ao valor em R$ (números enormes e enganosos).
+    # itens = nº de itens (casos) distintos afetados pela atividade;
+    # valor = soma do valor (R$) desses itens.
     atividades = []
     for a, cases in act_cases.items():
+        valor = float(valor_by_case.loc[list(cases)].sum()) if valor_by_case is not None else 0.0
         atividades.append({
             "atividade": label_map.get(a, str(a)),
             "itens": len(cases),
+            "valor": round(valor, 2),
             "ocorrencias": int(act_extra[a]),
         })
     atividades.sort(key=lambda r: r["ocorrencias"], reverse=True)
 
     # ── custo estimado de retrabalho ─────────────────────────────────────────
-    # premissa: cada item (caso) cancelado ou alterado custa 10 min × R$ 50/h
-    # = R$ 8,33 por item afetado (conta o item uma vez, não por ocorrência)
-    REWORK_MIN = 10
+    # premissa: cada item (caso) cancelado ou alterado custa 30 min × R$ 50/h
+    # = R$ 25,00 por item afetado (conta o item uma vez, não por ocorrência)
+    REWORK_MIN = 30
     REWORK_HORA = 50.0
     itens_afetados = len(rework_cases)
     custo_retrabalho = round(itens_afetados * (REWORK_MIN / 60) * REWORK_HORA, 2)
