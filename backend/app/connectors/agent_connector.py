@@ -37,6 +37,13 @@ class AgentConnector:
                         headers={"X-API-Key": self.key, "Content-Type": "application/json"},
                         json={"sql": sql, "limit": limit},
                     )
+                    # 5xx do agent/túnel costuma ser transiente (sobrecarga) →
+                    # retry (SELECT é idempotente); 4xx falha de imediato
+                    if r.status_code >= 500:
+                        last = httpx.HTTPStatusError(
+                            f"{r.status_code} do agent", request=r.request, response=r)
+                        time.sleep(1.5 * (attempt + 1))
+                        continue
                     r.raise_for_status()
                     # Cordeiro/SAP-B1: agent rotula UTF-8 mas entrega bytes cp1252.
                     # Vedara/veddara: agent entrega UTF-8 real (tabelas de PM modernas).
