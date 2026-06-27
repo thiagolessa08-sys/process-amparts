@@ -11,7 +11,7 @@ import { AssistantScreen } from "./ScreenAssistant.jsx";
 import { TwoMatchScreen } from "./ScreenTwoMatch.jsx";
 import { UserProdScreen } from "./ScreenUserProd.jsx";
 import { LoginScreen, readAuth, clearAuth } from "./ScreenLogin.jsx";
-import { fetchModule, fetchModuleStatus, uploadCsv, refreshModule } from "./api.js";
+import { fetchModule, fetchModuleStatus, uploadCsv, refreshModule, setAuthToken } from "./api.js";
 
 const SCREENS = [
   { id: "explorer", label: "Explorador", icon: "explorer" },
@@ -255,7 +255,10 @@ export default function App() {
     return () => { alive = false; clearInterval(id); };
   }, [polling, moduleKey, filters, load]);
 
-  useEffect(() => { yearDefaulted.current = null; setFilters(EMPTY_FILTERS); load(moduleKey, EMPTY_FILTERS); }, [moduleKey, load]);
+  useEffect(() => {
+    if (!auth?.token) return;   // só carrega depois de autenticado (evita 401 no mount)
+    yearDefaulted.current = null; setFilters(EMPTY_FILTERS); load(moduleKey, EMPTY_FILTERS);
+  }, [moduleKey, load, auth]);
   useEffect(() => { setDrill(null); }, [moduleKey, screen]);
 
   const onFiltersChange = useCallback((f) => { setFilters(f); load(moduleKey, f); }, [moduleKey, load]);
@@ -343,7 +346,7 @@ export default function App() {
         </div>
         <button
           className="icon-btn"
-          onClick={() => { clearAuth(); setAuth(null); }}
+          onClick={() => { setAuthToken(""); clearAuth(); setAuth(null); }}
           title="Sair"
         >
           <Icon name="logout" size={17} />

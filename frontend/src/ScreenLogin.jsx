@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Icon } from "./icons.jsx";
-import { login as apiLogin } from "./api.js";
+import { login as apiLogin, setAuthToken } from "./api.js";
 
 /* Login real contra o backend (POST /api/login) — ver app/auth.py. */
 
@@ -39,6 +39,7 @@ export function LoginScreen({ onLogin, dark, onToggleTheme }) {
     setBusy(true);
     try {
       const user = await apiLogin(email.trim().toLowerCase(), pass);
+      setAuthToken(user.token);          // disponível na sessão, mesmo sem "Lembrar"
       if (remember) saveAuth(user);
       onLogin(user);
     } catch (err) {

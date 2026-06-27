@@ -1,9 +1,15 @@
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-/* token do usuário logado (Authorization: Bearer) */
+/* token do usuário logado — em memória (vale na sessão mesmo sem "Lembrar"),
+   com fallback no localStorage (sessão lembrada que sobreviveu a um refresh). */
+let _token = "";
+export function setAuthToken(t) { _token = t || ""; }
+
 function authHeaders(extra = {}) {
-  let token = "";
-  try { token = JSON.parse(localStorage.getItem("pm-auth") || "{}")?.token || ""; } catch { /* */ }
+  let token = _token;
+  if (!token) {
+    try { token = JSON.parse(localStorage.getItem("pm-auth") || "{}")?.token || ""; } catch { /* */ }
+  }
   return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
 }
 
