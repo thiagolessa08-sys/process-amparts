@@ -12,6 +12,7 @@ function fmtCompact(n) {
 }
 const fmtInt = (n) => (Number(n) || 0).toLocaleString("pt-BR");
 const fmtPct = (n) => (Number(n) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
+const fmtMoney = (n) => (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 /* ───────── Pizza (com/sem retrabalho) ───────── */
 const PIE_COLORS = { "Com Retrabalho": "#e5484d", "Sem Retrabalho": "#16a34a" };
@@ -180,14 +181,29 @@ export function ReworkScreen({ data }) {
         </div>
       </div>
       <div className="rwk-col">
-        <div className="rwk-kpi">
-          <span className="rwk-kpi-ic"><Icon name="loop" size={20} /></span>
-          <div className="rwk-kpi-txt">
-            <div className="rwk-kpi-label">Retrabalho geral</div>
-            <div className="rwk-kpi-desc">% de casos com ao menos uma atividade de retrabalho</div>
+        <div className="rwk-kpi-row">
+          <div className="rwk-kpi">
+            <span className="rwk-kpi-ic"><Icon name="loop" size={20} /></span>
+            <div className="rwk-kpi-txt">
+              <div className="rwk-kpi-label">Retrabalho geral</div>
+              <div className="rwk-kpi-desc">% de casos com ao menos uma atividade de retrabalho</div>
+            </div>
+            <span className="rwk-kpi-spacer" />
+            <div className="rwk-kpi-value">{fmtPct(rw.pctComRetrabalho ?? 0)}</div>
           </div>
-          <span className="rwk-kpi-spacer" />
-          <div className="rwk-kpi-value">{fmtPct(rw.pctComRetrabalho ?? 0)}</div>
+          <div className="rwk-kpi rwk-kpi-cost">
+            <span className="rwk-kpi-ic"><Icon name="bolt" size={20} /></span>
+            <div className="rwk-kpi-txt">
+              <div className="rwk-kpi-label">Custo estimado de retrabalho</div>
+              <div className="rwk-kpi-desc">
+                {(rw.ocorrenciasRetrabalho ?? 0).toLocaleString("pt-BR")} atividades ·{" "}
+                {rw.custoPremissa?.minutos ?? 10} min ·{" "}
+                {fmtMoney(rw.custoPremissa?.valorHora ?? 50)}/h
+              </div>
+            </div>
+            <span className="rwk-kpi-spacer" />
+            <div className="rwk-kpi-value">{fmtMoney(rw.custoRetrabalho ?? 0)}</div>
+          </div>
         </div>
         <AtividadesPanel rows={rw.atividades} />
         <div className="rwk-bottom">

@@ -544,11 +544,14 @@
   .rwk-col { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
   .rwk-col > .panel { flex: 0 0 auto; }
   .rwk-col > .rwk-bottom { flex: 1 1 auto; }
+  .rwk-kpi-row { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .rwk-kpi {
     flex: 0 0 auto; display: flex; align-items: center; gap: 14px;
     background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-    padding: 13px 18px; box-shadow: var(--shadow-card);
+    padding: 13px 18px; box-shadow: var(--shadow-card); min-width: 0;
   }
+  .rwk-kpi-cost .rwk-kpi-ic { background: rgba(234, 140, 14, 0.14); color: #e08c0e; }
+  .rwk-kpi-cost .rwk-kpi-value { color: #e08c0e; }
   .rwk-kpi-ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center;
     background: var(--red-soft); color: var(--red); flex: none; }
   .rwk-kpi-txt { min-width: 0; }

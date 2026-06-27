@@ -66,6 +66,13 @@ def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = N
         })
     atividades.sort(key=lambda r: r["ocorrencias"], reverse=True)
 
+    # ── custo estimado de retrabalho ─────────────────────────────────────────
+    # premissa: cada atividade de retrabalho custa 10 min × R$ 50/h = R$ 8,33
+    REWORK_MIN = 10
+    REWORK_HORA = 50.0
+    total_ocorr = sum(a["ocorrencias"] for a in atividades)
+    custo_retrabalho = round(total_ocorr * (REWORK_MIN / 60) * REWORK_HORA, 2)
+
     # ── com ou sem retrabalho ────────────────────────────────────────────────
     com = len(rework_cases)
     pct_com = round(100 * com / total, 2) if total else 0.0
@@ -96,4 +103,7 @@ def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = N
         "comSem": com_sem,
         "porEntidade": por_entidade,
         "pctComRetrabalho": pct_com,
+        "custoRetrabalho": custo_retrabalho,
+        "ocorrenciasRetrabalho": total_ocorr,
+        "custoPremissa": {"minutos": REWORK_MIN, "valorHora": REWORK_HORA},
     }
