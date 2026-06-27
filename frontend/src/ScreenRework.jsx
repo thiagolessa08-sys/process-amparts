@@ -196,7 +196,7 @@ export function ReworkScreen({ data }) {
             <div className="rwk-kpi-txt">
               <div className="rwk-kpi-label">Custo estimado de retrabalho</div>
               <div className="rwk-kpi-desc">
-                {(rw.ocorrenciasRetrabalho ?? 0).toLocaleString("pt-BR")} atividades ·{" "}
+                {(rw.itensRetrabalho ?? 0).toLocaleString("pt-BR")} itens cancelados/alterados ·{" "}
                 {rw.custoPremissa?.minutos ?? 10} min ·{" "}
                 {fmtMoney(rw.custoPremissa?.valorHora ?? 50)}/h
               </div>
