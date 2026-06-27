@@ -53,15 +53,16 @@ def rework(log: pd.DataFrame, dim_col: str, label_map: dict, top: int | None = N
         rework_cases = set().union(*act_cases.values()) if act_cases else set()
 
     total = len(seqs)
-    itens_by_case = first["itens"] if has("itens") else None
 
     # ── atividades de retrabalho ─────────────────────────────────────────────
+    # itens = nº de itens (casos) distintos afetados pela atividade — NÃO o valor:
+    # o event log não traz quantidade de itens, então usar `first["itens"]` caía
+    # num fallback igual ao valor em R$ (números enormes e enganosos).
     atividades = []
     for a, cases in act_cases.items():
-        itens = int(itens_by_case.loc[list(cases)].sum()) if itens_by_case is not None else 0
         atividades.append({
             "atividade": label_map.get(a, str(a)),
-            "itens": itens,
+            "itens": len(cases),
             "ocorrencias": int(act_extra[a]),
         })
     atividades.sort(key=lambda r: r["ocorrencias"], reverse=True)
