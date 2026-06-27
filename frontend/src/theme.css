@@ -1309,8 +1309,11 @@
     gap: 10px;
     padding-left: 36px;   /* espaço p/ o conector horizontal */
   }
-  .node.branch { width: 178px; }
+  .node.branch { width: 178px; background: var(--red-soft); border-color: var(--red-line); }
+  .node.branch:hover { border-color: var(--red); }
   .node.branch .node-title { color: var(--red, #d4434a); }
+  .node.branch .node-count { color: var(--red); }
+  .node.branch .node-pct { background: var(--panel); color: var(--red); }
   .branch-link {
     fill: none;
     stroke: #e5707e;

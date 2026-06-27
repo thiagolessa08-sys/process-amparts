@@ -268,7 +268,7 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
       <div key={id} className={"node" + (branch ? " branch" : "")} data-nid={id}
         ref={(el) => { nodeRefs.current[id] = el; }}
         onClick={(e) => onNodeClick?.(id, e.currentTarget.getBoundingClientRect())}>
-        <div className="node-accent" style={{ background: branch ? "#e5707e" : freqColor(ratio) }} />
+        <div className="node-accent" style={{ background: branch ? "var(--red)" : freqColor(ratio) }} />
         <div className="node-body">
           <div className="node-title">{node.label}</div>
           <div className="node-stats">
