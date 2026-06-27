@@ -264,11 +264,13 @@ export function Graph({ graphData, mode, zoom, pan, dragging, animKey, moduleKey
     const node = nodeById[id];
     if (!node) return null;
     const ratio = node.cases / graphData.totalCases;
+    // qualquer atividade de cancelamento fica vermelha (esteja na espinha ou em ramo)
+    const isCancel = /cancel/i.test(node.label || "");
     return (
-      <div key={id} className={"node" + (branch ? " branch" : "")} data-nid={id}
+      <div key={id} className={"node" + (branch ? " branch" : "") + (isCancel ? " cancel" : "")} data-nid={id}
         ref={(el) => { nodeRefs.current[id] = el; }}
         onClick={(e) => onNodeClick?.(id, e.currentTarget.getBoundingClientRect())}>
-        <div className="node-accent" style={{ background: branch ? "var(--red)" : freqColor(ratio) }} />
+        <div className="node-accent" style={{ background: (isCancel || branch) ? "var(--red)" : freqColor(ratio) }} />
         <div className="node-body">
           <div className="node-title">{node.label}</div>
           <div className="node-stats">
