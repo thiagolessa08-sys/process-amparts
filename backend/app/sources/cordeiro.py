@@ -142,10 +142,12 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None, progress=None) ->
     })
     log = log.dropna(subset=["timestamp"])
 
-    # valor por caso = soma do valor de item do pedido
+    # valor por caso = faturado (FAT_VALOR). PED_VALOR é majoritariamente nulo
+    # no Cordeiro (deixava o KPI baixíssimo), então usa o faturado e só cai
+    # para PED_VALOR quando não há faturamento.
     if not cases.empty:
-        val = (cases.assign(_k=cases["_CASE_KEY_O2C"].astype(str),
-                            _v=_num(cases["PED_VALOR"]).fillna(0.0))
+        _v = _num(cases["FAT_VALOR"]).fillna(_num(cases["PED_VALOR"])).fillna(0.0)
+        val = (cases.assign(_k=cases["_CASE_KEY_O2C"].astype(str), _v=_v)
                     .groupby("_k")["_v"].sum())
         log["valor"] = log["case_id"].map(val).fillna(0.0)
     else:
