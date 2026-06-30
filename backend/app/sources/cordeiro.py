@@ -96,6 +96,7 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None, progress=None) ->
     global _CASES_DETAIL
     if not cases.empty:
         _CASES_DETAIL = pd.DataFrame({
+            "_case_id": cases["_CASE_KEY_O2C"].astype(str),   # oculto: casar com variante
             "pedido": cases["PEDIDO"],
             "data": _date(cases["DATA_PEDIDO"]),
             "orcamento": cases["ORCAMENTO"],

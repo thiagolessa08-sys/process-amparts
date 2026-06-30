@@ -95,6 +95,7 @@ def load_vedara_eventlog(conn: AgentConnector | None = None, progress=None) -> p
     global _CASES_DETAIL
     if not cases.empty:
         _CASES_DETAIL = pd.DataFrame({
+            "_case_id": cases["_CASE_KEY_O2C"].astype(str),   # oculto: casar com variante
             "nrPed": cases["NR_PEDIDO"],
             "data": pd.to_datetime(cases["DT_PEDIDO"], errors="coerce").dt.strftime("%Y-%m-%d"),
             "nrOrc": cases["NR_ORCAMENTO"],

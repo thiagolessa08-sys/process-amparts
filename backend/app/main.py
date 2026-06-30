@@ -391,13 +391,18 @@ def get_details(
     produto: Optional[str] = Query(default=None),
     q: Optional[str] = Query(default=None),
     colf: list[str] = Query(default=[]),
+    act_id: Optional[str] = Query(default=None),
+    act_mode: Optional[str] = Query(default=None),
+    variant: list[str] = Query(default=[]),
+    variant_mode: str = Query(default="include"),
     limit: int = Query(default=500),
     offset: int = Query(default=0),
 ):
     """Detalhe por caso/item (tela Detalhes), por módulo.
 
     `colf`: filtros por coluna no formato "chave:valor" (contains, sem
-    distinção de maiúsculas) — varre a base inteira antes de paginar."""
+    distinção de maiúsculas) — varre a base inteira antes de paginar.
+    `variant`/`act_id`: mesmos filtros das outras telas (via event log)."""
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
@@ -436,7 +441,19 @@ def get_details(
         cval = cval.strip().lower()
         if cval and ckey in df.columns:
             mask &= df[ckey].astype(str).str.lower().str.contains(cval, regex=False, na=False)
-    df = df[mask]
+
+    # filtro por variante / atividade — usa o event log (sequências) e cruza
+    # pelos case_ids. Só aplica quando o detalhe tem a coluna oculta "_case_id".
+    if (variant or act_id) and "_case_id" in df.columns:
+        elog = data_source.get_log(module_key=key)
+        elog = _apply_filters(elog, [], None, None, ano, mes, dias, produto,
+                              order_activity=module.order_activity)
+        elog = _apply_activity_filter(elog, module, act_id, act_mode)
+        elog = _apply_variant_filter(elog, module, variant, variant_mode)
+        allowed = set(elog[CASE_ID].astype(str).unique())
+        mask &= df["_case_id"].astype(str).isin(allowed)
+
+    df = df[mask].drop(columns=["_case_id"], errors="ignore")
 
     total = int(len(df))
     page = df.iloc[offset: offset + max(0, limit)]
