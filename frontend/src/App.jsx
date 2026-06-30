@@ -172,9 +172,11 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
             <div className="kpi-top">
               <span className="kpi-chip"><Icon name={k.icon} size={15} /></span>
               <span className="kpi-label">{k.label}</span>
-              <span className={"kpi-delta" + (k.accent === "itens" ? " muted" : "")}>
-                <Icon name="trendUp" size={12} />{k.delta}
-              </span>
+              {k.delta && (
+                <span className={"kpi-delta" + (k.accent === "itens" ? " muted" : "")}>
+                  <Icon name="trendUp" size={12} />{k.delta}
+                </span>
+              )}
             </div>
             <div className="kpi-bottom">
               <div className="kpi-value">{k.value}{k.unit && <span className="unit"> {k.unit}</span>}</div>

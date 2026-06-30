@@ -148,10 +148,21 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None, progress=None) ->
     # validado com a base do Rafael (jan/2026 ≈ R$ 211,8M no FAT_TOTAL). Cai
     # para PED_TOTAL quando não há faturamento.
     if not cases.empty:
+        _ck = cases["_CASE_KEY_O2C"].astype(str)
+
+        def _case_sum(col):
+            s = (cases.assign(_k=_ck, _v=_num(cases[col]).fillna(0.0))
+                      .groupby("_k")["_v"].sum())
+            return log["case_id"].map(s).fillna(0.0)
+
         _v = _num(cases["FAT_TOTAL"]).fillna(_num(cases["PED_TOTAL"])).fillna(0.0)
-        val = (cases.assign(_k=cases["_CASE_KEY_O2C"].astype(str), _v=_v)
-                    .groupby("_k")["_v"].sum())
+        val = (cases.assign(_k=_ck, _v=_v).groupby("_k")["_v"].sum())
         log["valor"] = log["case_id"].map(val).fillna(0.0)
+        # campos por caso p/ os 4 KPIs do Cordeiro (Qtde/Pedido/Faturamento/Pago)
+        log["qtde_un"] = _case_sum("PED_QTDE_ITEM")
+        log["ped_total"] = _case_sum("PED_TOTAL")
+        log["fat_total"] = _case_sum("FAT_TOTAL")
+        log["pag_total"] = _case_sum("PAG_TOTAL")
     else:
         log["valor"] = 0.0
 
