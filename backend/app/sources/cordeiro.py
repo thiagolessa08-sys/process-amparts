@@ -89,7 +89,7 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None, progress=None) ->
     cases = conn.paginate_offset(
         "_CASE_KEY_O2C, PEDIDO, ORCAMENTO, FATURA, CLIENTE, PROD_NOME, "
         "DATA_PEDIDO, DATA_EMISSAO_NF, DATA_PAGAMENTO, PED_QTDE_ITEM, "
-        "PED_VALOR, FAT_VALOR, PAG_VALOR",
+        "PED_VALOR, FAT_VALOR, PAG_VALOR, PED_TOTAL, FAT_TOTAL, PAG_TOTAL",
         CASE_TABLE, order="_CASE_KEY_O2C")
     progress(90)
 
@@ -104,9 +104,10 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None, progress=None) ->
             "cliente": cases["CLIENTE"],
             "produto": cases["PROD_NOME"],
             "qtde": _num(cases["PED_QTDE_ITEM"]),
-            "valorPed": _num(cases["PED_VALOR"]),
-            "valorFat": _num(cases["FAT_VALOR"]),
-            "valorPago": _num(cases["PAG_VALOR"]),
+            # *_VALOR é preço unitário; o valor da linha é *_TOTAL (= valor × qtde)
+            "valorPed": _num(cases["PED_TOTAL"]),
+            "valorFat": _num(cases["FAT_TOTAL"]),
+            "valorPago": _num(cases["PAG_TOTAL"]),
             "dataPag": _date(cases["DATA_PAGAMENTO"]),
         })
 
@@ -142,11 +143,12 @@ def load_cordeiro_eventlog(conn: AgentConnector | None = None, progress=None) ->
     })
     log = log.dropna(subset=["timestamp"])
 
-    # valor por caso = faturado (FAT_VALOR). PED_VALOR é majoritariamente nulo
-    # no Cordeiro (deixava o KPI baixíssimo), então usa o faturado e só cai
-    # para PED_VALOR quando não há faturamento.
+    # valor por caso = total faturado da linha (FAT_TOTAL = preço unitário ×
+    # quantidade). FAT_VALOR sozinho é só o unitário (deixava o KPI baixíssimo);
+    # validado com a base do Rafael (jan/2026 ≈ R$ 211,8M no FAT_TOTAL). Cai
+    # para PED_TOTAL quando não há faturamento.
     if not cases.empty:
-        _v = _num(cases["FAT_VALOR"]).fillna(_num(cases["PED_VALOR"])).fillna(0.0)
+        _v = _num(cases["FAT_TOTAL"]).fillna(_num(cases["PED_TOTAL"])).fillna(0.0)
         val = (cases.assign(_k=cases["_CASE_KEY_O2C"].astype(str), _v=_v)
                     .groupby("_k")["_v"].sum())
         log["valor"] = log["case_id"].map(val).fillna(0.0)
