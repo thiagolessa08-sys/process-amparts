@@ -587,6 +587,25 @@
   .det-table tbody td:first-child { font-weight: 600; color: var(--ink); }
   .det-table tbody tr:nth-child(even) { background: var(--inset); }
   .det-table tbody tr:hover { background: var(--hover); }
+  /* linha de filtros por coluna (sob o cabeçalho roxo) */
+  .det-table thead tr.det-filter-row th {
+    background: var(--inset); padding: 5px 7px; border-radius: 0;
+    border-bottom: 1px solid var(--line); text-align: left;
+  }
+  .det-colf {
+    width: 100%; box-sizing: border-box; font: inherit; font-size: 12px;
+    padding: 4px 8px; border: 1px solid var(--line); border-radius: 7px;
+    background: var(--panel); color: var(--ink); outline: none;
+  }
+  .det-colf:focus { border-color: var(--violet); box-shadow: 0 0 0 2px var(--violet-100); }
+  .det-colf::placeholder { color: var(--faint); font-size: 11px; }
+  .det-clear {
+    display: inline-flex; align-items: center; gap: 4px; margin-left: 10px;
+    font-size: 12px; font-weight: 600; color: var(--red);
+    background: var(--red-soft); border: 1px solid var(--red-line);
+    border-radius: 8px; padding: 4px 9px; cursor: pointer;
+  }
+  .det-clear:hover { background: #fbdcde; }
   /* Pedidos Pendentes: ~11 linhas visíveis (cabeçalho sticky) + rolagem */
   .tm-pend-wrap { flex: none; max-height: 421px; }
 

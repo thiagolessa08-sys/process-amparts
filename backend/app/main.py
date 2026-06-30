@@ -390,10 +390,14 @@ def get_details(
     dias: list[int] = Query(default=[]),
     produto: Optional[str] = Query(default=None),
     q: Optional[str] = Query(default=None),
+    colf: list[str] = Query(default=[]),
     limit: int = Query(default=500),
     offset: int = Query(default=0),
 ):
-    """Detalhe por caso/item (tela Detalhes), por módulo."""
+    """Detalhe por caso/item (tela Detalhes), por módulo.
+
+    `colf`: filtros por coluna no formato "chave:valor" (contains, sem
+    distinção de maiúsculas) — varre a base inteira antes de paginar."""
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
@@ -426,6 +430,12 @@ def get_details(
                 hay = s if hay is None else (hay + " " + s)
         if hay is not None:
             mask &= hay.str.contains(ql, regex=False, na=False)
+    # filtros por coluna (chave:valor, contains case-insensitive)
+    for cf in colf:
+        ckey, _, cval = cf.partition(":")
+        cval = cval.strip().lower()
+        if cval and ckey in df.columns:
+            mask &= df[ckey].astype(str).str.lower().str.contains(cval, regex=False, na=False)
     df = df[mask]
 
     total = int(len(df))

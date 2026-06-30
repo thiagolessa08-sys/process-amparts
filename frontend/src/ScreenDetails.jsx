@@ -12,19 +12,28 @@ export function DetailsScreen({ data, filters }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState("");
+  const [colFilters, setColFilters] = useState({});  // { colKey: valor }
 
-  // busca server-side (Nr. PED / cliente / produto); debounce 300ms
+  const colKey = JSON.stringify(colFilters);
+  const hasColFilter = Object.values(colFilters).some((v) => v && String(v).trim());
+
+  // busca server-side (texto global + filtros por coluna); debounce 300ms
   useEffect(() => {
     let alive = true;
     setLoading(true); setError(null);
     const t = setTimeout(() => {
-      fetchDetails(data.key, filters, { q: query, limit: PAGE_LIMIT })
+      fetchDetails(data.key, filters, { q: query, colFilters, limit: PAGE_LIMIT })
         .then((r) => { if (alive) setRes(r); })
         .catch((e) => { if (alive) setError(e.message); })
         .finally(() => { if (alive) setLoading(false); });
     }, 300);
     return () => { alive = false; clearTimeout(t); };
-  }, [data.key, filters, query]);
+  }, [data.key, filters, query, colKey]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // troca de módulo / período limpa os filtros de coluna
+  useEffect(() => { setColFilters({}); }, [data.key]);
+
+  const setCol = (k, v) => setColFilters((p) => ({ ...p, [k]: v }));
 
   const cols = res?.columns || [];
   const rows = res?.rows || [];
@@ -47,11 +56,29 @@ export function DetailsScreen({ data, filters }) {
             ? `${fmtInt(rows.length)} de ${fmtInt(total)} registros`
             : `${fmtInt(total)} registros`}
         </span>
+        {(hasColFilter || query) && (
+          <button className="det-clear" onClick={() => { setColFilters({}); setQuery(""); }}>
+            <Icon name="close" size={13} /> Limpar filtros
+          </button>
+        )}
       </div>
       <div className="det-table-wrap">
         <table className="nf-table det-table">
           <thead>
             <tr>{cols.map((c) => <th key={c.key} className={isNum(c.fmt) ? "r" : ""}>{c.label}</th>)}</tr>
+            <tr className="det-filter-row">
+              {cols.map((c) => (
+                <th key={c.key}>
+                  <input
+                    className="det-colf"
+                    value={colFilters[c.key] || ""}
+                    onChange={(e) => setCol(c.key, e.target.value)}
+                    placeholder="filtrar…"
+                    aria-label={`Filtrar ${c.label}`}
+                  />
+                </th>
+              ))}
+            </tr>
           </thead>
           <tbody>
             {rows.map((row, i) => (

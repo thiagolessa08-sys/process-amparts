@@ -83,6 +83,11 @@ export function fetchDetails(key, filters = {}, opts = {}) {
   if (opts.q && opts.q.trim()) params.set("q", opts.q.trim());
   if (opts.limit) params.set("limit", opts.limit);
   if (opts.offset) params.set("offset", opts.offset);
+  if (opts.colFilters) {
+    Object.entries(opts.colFilters).forEach(([k, v]) => {
+      if (v && String(v).trim()) params.append("colf", `${k}:${String(v).trim()}`);
+    });
+  }
   const qs = params.toString();
   return getJson(`/api/modules/${key}/details${qs ? "?" + qs : ""}`);
 }
