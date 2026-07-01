@@ -721,7 +721,7 @@
   }
   .as-chip:hover { border-color: var(--violet); color: var(--violet); background: var(--violet-50); }
 
-  .as-msg { display: flex; gap: 11px; width: 100%; max-width: 760px; margin: 0 auto 18px; align-items: flex-start; }
+  .as-msg { display: flex; gap: 11px; width: 100%; max-width: 1080px; margin: 0 auto 18px; align-items: flex-start; }
   .as-msg.as-user { flex-direction: row-reverse; }
   .as-av {
     width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
@@ -778,6 +778,10 @@
   }
   .md-table td { padding: 6px 10px; border-bottom: 1px solid var(--line-2); color: var(--ink-2); }
   .md-table td.num { text-align: right; font-family: "JetBrains Mono", monospace; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  /* não quebrar palavras letra-a-letra (herança de word-break do .as-text):
+     colunas curtas (vendedor, prioridade) mantêm a largura; texto longo quebra no espaço */
+  .md-table th, .md-table td { word-break: normal; overflow-wrap: normal; white-space: normal; }
+  .md-table th { white-space: nowrap; }
   .md-table tbody tr:last-child td { border-bottom: none; }
   .md-table tbody tr:hover { background: var(--hover); }
 
@@ -826,7 +830,7 @@
 
   .as-input-bar {
     display: flex; align-items: flex-end; gap: 10px;
-    max-width: 760px; width: 100%; margin: 0 auto; padding: 12px 20px 18px;
+    max-width: 1080px; width: 100%; margin: 0 auto; padding: 12px 20px 18px;
   }
   .as-input {
     flex: 1; resize: none; font-family: inherit; font-size: 14px; line-height: 1.5;
