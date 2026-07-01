@@ -200,17 +200,22 @@ def ask(question: str, log: pd.DataFrame, module_name: str, dim_label: str,
     tools = [_RUN_QUERY_TOOL] + ([_REPORT_TOOL] if allow_report else [])
     messages = [{"role": "user", "content": question}]
     steps: list[dict] = []
+    forced = False   # no modo relatório, força emit_report se a IA tentar texto
 
-    for _ in range(MAX_STEPS + (3 if allow_report else 0)):
-        resp = client.messages.create(
-            model=MODEL,
-            max_tokens=4000,
-            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-            tools=tools,
-            thinking={"type": "adaptive"},
-            output_config={"effort": "medium"},
-            messages=messages,
-        )
+    for _ in range(MAX_STEPS + (4 if allow_report else 0)):
+        kwargs = {
+            "model": MODEL, "max_tokens": 6000 if allow_report else 4000,
+            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+            "tools": tools, "messages": messages,
+        }
+        if allow_report:
+            # relatório: sem extended thinking (incompatível com tool_choice forçado)
+            if forced:
+                kwargs["tool_choice"] = {"type": "tool", "name": "emit_report"}
+        else:
+            kwargs["thinking"] = {"type": "adaptive"}
+            kwargs["output_config"] = {"effort": "medium"}
+        resp = client.messages.create(**kwargs)
 
         if resp.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": resp.content})
@@ -237,7 +242,16 @@ def ask(question: str, log: pd.DataFrame, module_name: str, dim_label: str,
             messages.append({"role": "user", "content": tool_results})
             continue
 
+        # resposta em texto (end_turn)
         answer = "".join(b.text for b in resp.content if b.type == "text").strip()
+        if allow_report and not forced:
+            # a IA respondeu em texto em vez de emitir o relatório → força emit_report
+            messages.append({"role": "assistant", "content": answer or "Análise concluída."})
+            messages.append({"role": "user", "content":
+                             "Gere agora o RELATÓRIO chamando a ferramenta emit_report "
+                             "com os dados já coletados (KPIs, rankings, riscos e resumo)."})
+            forced = True
+            continue
         return {"answer": answer or "(sem resposta)", "steps": steps}
 
     return {"answer": "Não consegui concluir a análise em poucos passos. Tente reformular a pergunta.",

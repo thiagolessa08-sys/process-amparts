@@ -514,9 +514,13 @@ def ask_module(
         try:
             from app.ai.report_pdf import build_pdf, build_report_pdf
             rep = result.pop("report", None)
+            pdf_bytes = None
             if rep:
-                pdf_bytes = build_report_pdf(rep, module.name)
-            else:
+                try:
+                    pdf_bytes = build_report_pdf(rep, module.name)   # template rico
+                except Exception:  # noqa: BLE001 — cai no simples se o rico falhar
+                    pdf_bytes = None
+            if pdf_bytes is None:
                 pdf_bytes = build_pdf(module.name, body.question,
                                       result.get("answer", ""), result.get("steps"))
             result["pdf"] = base64.b64encode(pdf_bytes).decode("ascii")
