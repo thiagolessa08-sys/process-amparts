@@ -96,6 +96,36 @@ def _mh(pdf, w, txt, size, style="", h=4.6):
     return pdf.multi_cell(w, h, _lat1(_strip_inline(txt)), dry_run=True, output="HEIGHT")
 
 
+def _ensure(pdf, y, need, top, bot=15.0):
+    """Quebra de página se o bloco (altura `need`) não couber; retorna o novo y."""
+    if y + need > pdf.h - bot:
+        pdf.add_page()
+        return top
+    return y
+
+
+def _ellipsize(pdf, txt, maxw, size, style=""):
+    pdf.set_font("Helvetica", style, size)
+    t = _lat1(txt)
+    if pdf.get_string_width(t) <= maxw:
+        return t
+    while t and pdf.get_string_width(t + "...") > maxw:
+        t = t[:-1]
+    return (t + "...") if t else ""
+
+
+def _fit_size(pdf, txt, maxw, base, style="B", minsize=8.0):
+    """Maior tamanho <= base que faz `txt` caber em `maxw` (evita estouro lateral)."""
+    t = _lat1(txt)
+    size = base
+    while size > minsize:
+        pdf.set_font("Helvetica", style, size)
+        if pdf.get_string_width(t) <= maxw:
+            return size
+        size -= 0.5
+    return minsize
+
+
 # ───────────────────────── template RICO ─────────────────────────
 def build_report_pdf(report: dict, module_name: str, when: datetime | None = None) -> bytes:
     when = when or datetime.now()
@@ -106,6 +136,7 @@ def build_report_pdf(report: dict, module_name: str, when: datetime | None = Non
     pdf.set_margins(L, T, R)
     pdf.add_page()
     W = pdf.w - L - R
+    NEWTOP = 16.0   # topo do conteúdo nas páginas de continuação (sem cabeçalho)
 
     # ── cabeçalho ──
     _rrect(pdf, L, T, 8, 8, r=2, fill=VIOLET)
@@ -127,6 +158,7 @@ def build_report_pdf(report: dict, module_name: str, when: datetime | None = Non
         tw = W - 10
         th = _mh(pdf, tw, report["definition"], 9, "", 4.4)
         bh = th + 7
+        y = _ensure(pdf, y, bh + 5, NEWTOP)
         _rrect(pdf, L, y, W, bh, r=2.5, fill=VIOLET_BG)
         _rrect(pdf, L, y, 1.3, bh, r=0.6, fill=VIOLET)
         _mtext(pdf, L + 5, y + 3.5, tw, report["definition"], 9, INK, "", 4.4)
@@ -139,6 +171,7 @@ def build_report_pdf(report: dict, module_name: str, when: datetime | None = Non
         gap = 4
         cw = (W - gap * (n - 1)) / n
         ch = 26
+        y = _ensure(pdf, y, ch + 5, NEWTOP)
         for i, k in enumerate(kpis):
             x = L + i * (cw + gap)
             hot = bool(k.get("highlight"))
@@ -148,7 +181,8 @@ def build_report_pdf(report: dict, module_name: str, when: datetime | None = Non
             val_c = (WHITE if hot else INK)
             sub_c = ((220, 210, 250) if hot else FAINT)
             _mtext(pdf, x + 4, y + 3.5, cw - 8, k.get("label", ""), 7.6, lab_c, "B", 3.3)
-            _text(pdf, x + 4, y + 12.5, k.get("value", ""), 14.5, val_c, "B", h=6)
+            vsize = _fit_size(pdf, k.get("value", ""), cw - 8, 14.5, "B", 8.5)
+            _text(pdf, x + 4, y + 12.5, k.get("value", ""), vsize, val_c, "B", h=6)
             if k.get("sub"):
                 _mtext(pdf, x + 4, y + 20, cw - 8, k["sub"], 6.8, sub_c, "", 3.0)
         y += ch + 5
@@ -159,6 +193,7 @@ def build_report_pdf(report: dict, module_name: str, when: datetime | None = Non
         segs = comp["segments"]
         total = sum(max(0, float(s.get("value", 0))) for s in segs) or 1
         bh = 22
+        y = _ensure(pdf, y, bh + 5, NEWTOP)
         _rrect(pdf, L, y, W, bh, r=3, fill=CARD_BG, border=LINE)
         _text(pdf, L + 5, y + 3.2, comp.get("label", "Composicao"), 9.5, INK, "B", h=4)
         if comp.get("total"):
@@ -189,6 +224,7 @@ def build_report_pdf(report: dict, module_name: str, when: datetime | None = Non
         pw = (W - gap) / 2 if len(bars) == 2 else W
         rows_max = max(len(b.get("items", [])) for b in bars)
         ph = 14 + rows_max * 9.5 + (9 if any(b.get("note") for b in bars) else 0)
+        y = _ensure(pdf, y, ph + 5, NEWTOP)
         for i, b in enumerate(bars):
             x = L + i * (pw + gap)
             _rrect(pdf, x, y, pw, ph, r=3, fill=CARD_BG, border=LINE)
@@ -199,7 +235,8 @@ def build_report_pdf(report: dict, module_name: str, when: datetime | None = Non
             mx = max([float(it.get("amount", 0)) for it in items] or [1]) or 1
             ry = y + 12.5
             for it in items:
-                _text(pdf, x + 5, ry, it.get("label", ""), 8, INK, "B", h=4)
+                lab = _ellipsize(pdf, it.get("label", ""), pw - 33, 8, "B")
+                _text(pdf, x + 5, ry, lab, 8, INK, "B", h=4)
                 _text(pdf, x, ry, it.get("value", ""), 8, INK, "", w=pw - 5, h=4, align="R")
                 frac = max(0.0, float(it.get("amount", 0)) / mx)
                 pdf.set_fill_color(*VIOLET_2)
@@ -215,15 +252,14 @@ def build_report_pdf(report: dict, module_name: str, when: datetime | None = Non
     # ── riscos e recomendações ──
     risks = (report.get("risks") or [])[:3]
     if risks:
-        _text(pdf, L, y, "Riscos e recomendacoes", 11, INK, "B", h=5)
-        y += 6
         gap = 4
         n = len(risks)
         cw = (W - gap * (n - 1)) / n
-        heights = []
-        for rk in risks:
-            heights.append(_mh(pdf, cw - 8, rk.get("text", ""), 7.6, "", 3.3))
+        heights = [_mh(pdf, cw - 8, rk.get("text", ""), 7.6, "", 3.3) for rk in risks]
         ch = max(heights) + 14
+        y = _ensure(pdf, y, 6 + ch + 5, NEWTOP)
+        _text(pdf, L, y, "Riscos e recomendacoes", 11, INK, "B", h=5)
+        y += 6
         for i, rk in enumerate(risks):
             x = L + i * (cw + gap)
             tone = _TONE.get(rk.get("tone", "violet"), VIOLET_2)
@@ -240,6 +276,7 @@ def build_report_pdf(report: dict, module_name: str, when: datetime | None = Non
         tw = W - 10
         th = _mh(pdf, tw, report["summary"], 9.5, "B", 4.6)
         bh = th + 10
+        y = _ensure(pdf, y, bh, NEWTOP)
         _rrect(pdf, L, y, W, bh, r=3, fill=VIOLET)
         _text(pdf, L + 5, y + 3.5, "RESUMO", 7.5, (215, 205, 250), "B", h=3.5)
         _mtext(pdf, L + 5, y + 7.5, tw, report["summary"], 9.5, WHITE, "B", 4.6)
