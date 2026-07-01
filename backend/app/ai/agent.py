@@ -11,7 +11,7 @@ import pandas as pd
 
 from app.eventlog import CASE_ID, ACTIVITY, TIMESTAMP
 
-MODEL = os.environ.get("AI_MODEL", "claude-opus-4-8")
+MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 MAX_STEPS = 5
 
 _RUN_QUERY_TOOL = {
