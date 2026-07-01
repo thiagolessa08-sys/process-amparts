@@ -19,6 +19,7 @@ from app import data_source
 from app import modules as module_registry
 from app.modules.cases import build_case_index, page_cases
 from app.connectors.csv_connector import CSVConnector
+from app.connectors.agent_connector import AgentConnector
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.stats import compute_statistics
@@ -494,17 +495,17 @@ def ask_module(
     if not body.question.strip():
         raise HTTPException(status_code=400, detail="Pergunta vazia")
 
-    log = data_source.get_log(module_key=key)
-    log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes,
-                         order_activity=module.order_activity)
-    if log.empty:
-        raise HTTPException(status_code=422, detail="Nenhum caso para os filtros aplicados")
-
-    dim_label = "Fornecedor" if "fornecedor" in log.columns else (
-        "Cliente" if "cliente" in log.columns else "Dimensão")
+    # SQL direto no banco (ignora filtros de tela): schema + conector do agent
+    src = _detail_source(key)
+    schema = getattr(src, "SCHEMA", None)
+    conn = AgentConnector()
+    if not (schema and conn.configured()):
+        raise HTTPException(status_code=503,
+                            detail="Fonte SQL não configurada para este módulo.")
+    dim_label = getattr(module, "dimension", None) or "Dimensão"
     wants_report = bool(re.search(r"\b(pdf|relat[óo]rios?)\b", body.question, re.IGNORECASE))
     try:
-        result = ask(body.question, log, module.name, dim_label,
+        result = ask(body.question, module.name, dim_label, sql_conn=conn, schema=schema,
                      allow_report=wants_report, history=body.history)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"Falha ao consultar a IA: {exc}")

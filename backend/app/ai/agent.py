@@ -6,10 +6,14 @@ Fluxo (tool use / Claude):
 """
 import os
 import json
+import re
+import pathlib
 
 import pandas as pd
 
 from app.eventlog import CASE_ID, ACTIVITY, TIMESTAMP
+
+_KNOWLEDGE_DIR = pathlib.Path(__file__).resolve().parent / "knowledge"
 
 MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 MAX_STEPS = 5
@@ -87,6 +91,75 @@ _REPORT_TOOL = {
         "required": ["title", "kpis", "summary"],
     },
 }
+
+_SQL_TOOL = {
+    "name": "run_sql",
+    "description": (
+        "Executa uma consulta SQL (somente SELECT) DIRETO no banco Sybase IQ e "
+        "retorna as linhas. Use `schema.TABELA`, sempre `SELECT TOP n`, aspas simples "
+        "para strings/datas, e as strings EXATAMENTE como no catálogo (case-sensitive). "
+        "Sem comentários. Não consulta filtros de tela — é o banco inteiro."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {"sql": {"type": "string", "description": "SELECT ... (Sybase IQ)"}},
+        "required": ["sql"],
+    },
+}
+
+# palavras que indicam escrita/DDL — bloqueadas (só SELECT de leitura)
+_SQL_BANNED = re.compile(
+    r"\b(insert|update|delete|drop|alter|create|truncate|merge|grant|revoke|"
+    r"exec|execute|call|into|commit|rollback)\b", re.IGNORECASE)
+
+
+def _load_knowledge() -> str:
+    parts = []
+    for name in ("catalog.md", "business_rules.md"):
+        f = _KNOWLEDGE_DIR / name
+        if f.exists():
+            parts.append(f.read_text(encoding="utf-8"))
+    return "\n\n".join(parts)
+
+
+def _safe_sql(conn, sql: str):
+    """Valida (SELECT-only) e executa a query no banco. Retorna (texto, tabela, erro)."""
+    s = (sql or "").strip().rstrip(";").strip()
+    low = s.lower()
+    if not (low.startswith("select") or low.startswith("with")):
+        return None, None, "Apenas SELECT é permitido."
+    if ";" in s:
+        return None, None, "Envie apenas UMA instrução SELECT (sem ';')."
+    if _SQL_BANNED.search(s):
+        return None, None, "Comando não permitido — somente SELECT de leitura."
+    try:
+        d = conn.query(s, limit=200)
+    except Exception as exc:  # noqa: BLE001
+        return None, None, f"Erro no banco: {exc}"
+    if isinstance(d, dict) and d.get("error"):
+        return None, None, f"Erro SQL: {str(d['error'])[:300]}"
+    cols = [str(c).strip() for c in d.get("columns", [])]
+    rows = d.get("rows", [])
+    table = {"columns": cols, "rows": [[_cell(v) for v in r] for r in rows[:50]]}
+    txt = json.dumps({"columns": cols, "nrows": len(rows), "rows": table["rows"][:50]},
+                     ensure_ascii=False, default=str)[:6000]
+    return txt, table, None
+
+
+def _sql_system(module_name: str, dim_label: str, schema: str) -> str:
+    return (
+        f"Você é um analista de dados do processo **{module_name}** (mineração de processos).\n"
+        f"Consulte SEMPRE o banco via a ferramenta **run_sql** (SELECT direto no Sybase IQ). "
+        f"O schema deste processo é **{schema}** — use as tabelas `{schema}.SQL_PM_*`.\n"
+        f"NÃO há filtros de tela: você consulta o banco INTEIRO. A dimensão de negócio é "
+        f"**{dim_label}**.\n\n"
+        f"=== CATÁLOGO DE DADOS E REGRAS DE NEGÓCIO ===\n{_load_knowledge()}\n"
+        "=== FIM ===\n\n"
+        "Rode as consultas necessárias, depois responda em **português**, conciso e citando "
+        "os números. Não invente dados. Se um SELECT voltar vazio, revise valor/caixa "
+        "(case-sensitive) e tente de novo antes de concluir."
+    )
+
 
 _BANNED = ("__", "import", "open(", "exec(", "eval(", "compile(",
            "os.", "sys.", "subprocess", "globals(", "locals(", "getattr", "setattr")
@@ -218,24 +291,32 @@ def _history_messages(history, question: str) -> list[dict]:
     return msgs
 
 
-def ask(question: str, log: pd.DataFrame, module_name: str, dim_label: str,
+def ask(question: str, module_name: str, dim_label: str, *,
+        log: pd.DataFrame = None, sql_conn=None, schema: str = None,
         allow_report: bool = False, history=None) -> dict:
     client = _build_client()
-    system = _schema_text(log, module_name, dim_label)
+    sql_mode = sql_conn is not None and bool(schema)
+    query_name = "run_sql" if sql_mode else "run_query"
+    if sql_mode:
+        system = _sql_system(module_name, dim_label, schema)
+        query_tool = _SQL_TOOL
+    else:
+        system = _schema_text(log, module_name, dim_label)
+        query_tool = _RUN_QUERY_TOOL
     if history:
         system += ("\n\nHá um histórico da conversa (perguntas/respostas anteriores) "
                    "nas mensagens anteriores — use-o para entender pedidos de "
-                   "acompanhamento (ex.: 'e o segundo?', 'detalha esse cliente'). "
-                   "Sempre reexecute as consultas com run_query sobre o `df` atual.")
+                   f"acompanhamento (ex.: 'e o segundo?', 'detalha esse cliente'). "
+                   f"Sempre reexecute as consultas com {query_name}.")
     if allow_report:
         system += (
-            "\n\nO usuário pediu um RELATÓRIO/PDF. Colete os dados necessários com "
-            "run_query (KPIs do período, rankings por cliente/vendedor, composição, "
+            f"\n\nO usuário pediu um RELATÓRIO/PDF. Colete os dados necessários com "
+            f"{query_name} (KPIs, rankings por cliente/vendedor, composição, "
             "cancelamentos/retrabalho) e então chame **emit_report** UMA vez com o "
             "relatório estruturado (KPIs, composição, barras, riscos e resumo). "
             "Traga insights e recomendações acionáveis. NÃO responda em texto."
         )
-    tools = [_RUN_QUERY_TOOL] + ([_REPORT_TOOL] if allow_report else [])
+    tools = [query_tool] + ([_REPORT_TOOL] if allow_report else [])
     messages = _history_messages(history, question)
     steps: list[dict] = []
     forced = False   # no modo relatório, força emit_report se a IA tentar texto
@@ -270,6 +351,14 @@ def ask(question: str, log: pd.DataFrame, module_name: str, dim_label: str,
                     code = block.input.get("code", "")
                     txt, table, err = _safe_run(log, code)
                     steps.append({"code": code, "table": table, "error": err})
+                    tool_results.append({
+                        "type": "tool_result", "tool_use_id": block.id,
+                        "content": err or txt or "(sem resultado)", "is_error": bool(err),
+                    })
+                elif block.name == "run_sql":
+                    sql = block.input.get("sql", "")
+                    txt, table, err = _safe_sql(sql_conn, sql)
+                    steps.append({"code": sql, "table": table, "error": err})
                     tool_results.append({
                         "type": "tool_result", "tool_use_id": block.id,
                         "content": err or txt or "(sem resultado)", "is_error": bool(err),
