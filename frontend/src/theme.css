@@ -771,18 +771,21 @@
     border: none; border-radius: 7px; padding: 4px 11px; cursor: pointer;
   }
   .md-tabtoggle button.on { background: var(--panel); color: var(--violet); box-shadow: var(--shadow-card); }
-  .md-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .md-table { width: 100%; border-collapse: collapse; font-size: 12.5px; border-radius: 9px; overflow: hidden; }
   .md-table th {
-    text-align: left; font-weight: 700; color: var(--muted); font-size: 10.5px;
-    text-transform: uppercase; letter-spacing: 0.03em; padding: 6px 10px; border-bottom: 2px solid var(--line);
+    text-align: left; font-weight: 700; color: var(--violet); font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 7px 10px;
+    background: var(--violet-100); border-bottom: 1px solid var(--violet-weak-2, var(--line));
   }
-  .md-table td { padding: 6px 10px; border-bottom: 1px solid var(--line-2); color: var(--ink-2); }
+  .md-table td { padding: 6px 10px; color: var(--ink-2); }
   .md-table td.num { text-align: right; font-family: "JetBrains Mono", monospace; font-weight: 600; color: var(--ink); white-space: nowrap; }
   /* não quebrar palavras letra-a-letra (herança de word-break do .as-text):
      colunas curtas (vendedor, prioridade) mantêm a largura; texto longo quebra no espaço */
   .md-table th, .md-table td { word-break: normal; overflow-wrap: normal; white-space: normal; }
   .md-table th { white-space: nowrap; }
-  .md-table tbody tr:last-child td { border-bottom: none; }
+  /* zebra: linha branca / linha cinza claro (overlay funciona nos 2 temas) */
+  .md-table tbody tr:nth-child(odd) { background: var(--panel); }
+  .md-table tbody tr:nth-child(even) { background: rgba(30, 35, 55, 0.045); }
   .md-table tbody tr:hover { background: var(--hover); }
 
   .md-chart { display: flex; flex-direction: column; gap: 9px; padding: 3px 0 2px; }
