@@ -101,12 +101,12 @@ export function aiStatus() {
   return getJson("/api/ai/status");
 }
 
-export async function askAssistant(key, question, filters = {}) {
+export async function askAssistant(key, question, filters = {}, history = []) {
   const qs = filterParams(filters);
   const res = await fetch(`${BASE}/api/modules/${key}/ask${qs ? "?" + qs : ""}`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, history }),
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));

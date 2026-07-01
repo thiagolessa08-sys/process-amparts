@@ -465,6 +465,7 @@ def get_details(
 
 class AskBody(BaseModel):
     question: str
+    history: list = []   # últimas trocas [{role, text}] p/ contexto de follow-up
 
 
 @app.get("/api/ai/status")
@@ -503,7 +504,8 @@ def ask_module(
         "Cliente" if "cliente" in log.columns else "Dimensão")
     wants_report = bool(re.search(r"\b(pdf|relat[óo]rios?)\b", body.question, re.IGNORECASE))
     try:
-        result = ask(body.question, log, module.name, dim_label, allow_report=wants_report)
+        result = ask(body.question, log, module.name, dim_label,
+                     allow_report=wants_report, history=body.history)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"Falha ao consultar a IA: {exc}")
 

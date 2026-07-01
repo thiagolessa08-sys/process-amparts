@@ -185,10 +185,37 @@ def _safe_run(df: pd.DataFrame, code: str):
     return txt, table, None
 
 
+def _history_messages(history, question: str) -> list[dict]:
+    """Monta os `messages` do Claude com o histórico (últimas trocas) + a pergunta
+    atual. Garante início em 'user' e alternância (a API exige)."""
+    raw = []
+    for h in (history or [])[-8:]:
+        role = h.get("role") if isinstance(h, dict) else None
+        text = (h.get("text") if isinstance(h, dict) else "") or ""
+        text = str(text).strip()[:2000]
+        if role in ("user", "assistant") and text:
+            raw.append({"role": role, "content": text})
+    raw.append({"role": "user", "content": question})
+    msgs: list[dict] = []
+    for m in raw:
+        if not msgs and m["role"] != "user":
+            continue                      # deve começar com user
+        if msgs and msgs[-1]["role"] == m["role"]:
+            msgs[-1] = m                  # colapsa consecutivos do mesmo papel
+        else:
+            msgs.append(m)
+    return msgs
+
+
 def ask(question: str, log: pd.DataFrame, module_name: str, dim_label: str,
-        allow_report: bool = False) -> dict:
+        allow_report: bool = False, history=None) -> dict:
     client = _build_client()
     system = _schema_text(log, module_name, dim_label)
+    if history:
+        system += ("\n\nHá um histórico da conversa (perguntas/respostas anteriores) "
+                   "nas mensagens anteriores — use-o para entender pedidos de "
+                   "acompanhamento (ex.: 'e o segundo?', 'detalha esse cliente'). "
+                   "Sempre reexecute as consultas com run_query sobre o `df` atual.")
     if allow_report:
         system += (
             "\n\nO usuário pediu um RELATÓRIO/PDF. Colete os dados necessários com "
@@ -198,7 +225,7 @@ def ask(question: str, log: pd.DataFrame, module_name: str, dim_label: str,
             "Traga insights e recomendações acionáveis. NÃO responda em texto."
         )
     tools = [_RUN_QUERY_TOOL] + ([_REPORT_TOOL] if allow_report else [])
-    messages = [{"role": "user", "content": question}]
+    messages = _history_messages(history, question)
     steps: list[dict] = []
     forced = False   # no modo relatório, força emit_report se a IA tentar texto
 

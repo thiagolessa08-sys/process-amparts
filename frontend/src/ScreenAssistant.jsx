@@ -205,10 +205,15 @@ export function AssistantScreen({ data, filters }) {
     const q = (text ?? input).trim();
     if (!q || loading) return;
     setInput("");
+    // contexto: últimas 4 trocas (user+assistant) antes da pergunta nova
+    const history = messages
+      .filter((m) => m.role === "user" || (m.role === "assistant" && !m.error))
+      .slice(-8)
+      .map((m) => ({ role: m.role, text: String(m.text || "").slice(0, 2000) }));
     setMessages((m) => [...m, { role: "user", text: q }]);
     setLoading(true);
     try {
-      const res = await askAssistant(data.key, q, filters);
+      const res = await askAssistant(data.key, q, filters, history);
       setMessages((m) => [...m, { role: "assistant", text: res.answer, steps: res.steps, pdf: res.pdf, pdfName: res.pdfName }]);
     } catch (e) {
       setMessages((m) => [...m, { role: "assistant", text: `⚠️ ${e.message}`, error: true }]);
