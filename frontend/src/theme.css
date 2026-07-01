@@ -722,7 +722,7 @@
   .as-chip:hover { border-color: var(--violet); color: var(--violet); background: var(--violet-50); }
 
   .as-msg { display: flex; gap: 11px; width: 100%; max-width: 760px; margin: 0 auto 18px; align-items: flex-start; }
-  .as-msg.user { flex-direction: row-reverse; }
+  .as-msg.as-user { flex-direction: row-reverse; }
   .as-av {
     width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
     display: grid; place-items: center; color: #fff;
@@ -732,13 +732,13 @@
     background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
     padding: 12px 15px; box-shadow: var(--shadow-card); max-width: 82%; min-width: 0;
   }
-  .as-msg.user .as-bubble {
+  .as-msg.as-user .as-bubble {
     background: linear-gradient(135deg, #6a40ea, #5a2fe0); border-color: transparent; color: #fff;
     box-shadow: 0 4px 14px -4px rgba(90,47,224,.5);
   }
   .as-bubble.err { background: var(--red-soft); border-color: var(--red-line); }
   .as-text { font-size: 14px; line-height: 1.55; color: inherit; white-space: pre-wrap; word-break: break-word; }
-  .as-msg.user .as-text { color: #fff; }
+  .as-msg.as-user .as-text { color: #fff; }
 
   /* markdown renderizado (mensagens do assistente) */
   .as-md { white-space: normal; }

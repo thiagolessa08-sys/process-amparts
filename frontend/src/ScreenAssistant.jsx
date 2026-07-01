@@ -159,7 +159,7 @@ export function AssistantScreen({ data, filters }) {
         )}
 
         {messages.map((m, i) => (
-          <div key={i} className={"as-msg " + m.role}>
+          <div key={i} className={"as-msg as-" + m.role}>
             {m.role === "assistant" && <div className="as-av"><Icon name="activity" size={15} /></div>}
             <div className={"as-bubble" + (m.error ? " err" : "")}>
               {m.role === "assistant"
@@ -172,7 +172,7 @@ export function AssistantScreen({ data, filters }) {
         ))}
 
         {loading && (
-          <div className="as-msg assistant">
+          <div className="as-msg as-assistant">
             <div className="as-av"><Icon name="activity" size={15} /></div>
             <div className="as-bubble"><div className="as-typing"><span /><span /><span /></div></div>
           </div>
