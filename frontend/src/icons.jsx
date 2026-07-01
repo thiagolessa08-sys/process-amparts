@@ -7,6 +7,7 @@ export function Icon({ name, size = 16, style, className, strokeWidth = 1.7 }) {
   const paths = {
     explorer: <><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.2l3 8M16 7.2l-3 8"/></>,
     variants: <><path d="M4 6h7M4 12h12M4 18h9"/><circle cx="18" cy="6" r="1.6"/><circle cx="19.5" cy="18" r="1.6"/></>,
+    hbars: <><path d="M4 5h11M4 12h16M4 19h7"/></>,
     dashboard: <><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="14" width="8" height="7" rx="1.5"/></>,
     upload: <><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></>,
     database: <><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-6"/><path d="M5 11.5v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-6"/></>,

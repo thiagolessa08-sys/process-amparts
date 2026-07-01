@@ -762,6 +762,32 @@
     border-radius: 5px; padding: 1px 5px;
   }
 
+  /* tabela markdown renderizada + toggle Tabela/Grafico */
+  .md-tablewrap { margin: 9px 0 5px; }
+  .md-tabtoggle { display: inline-flex; gap: 3px; margin-bottom: 8px; background: var(--inset); border-radius: 9px; padding: 3px; }
+  .md-tabtoggle button {
+    display: inline-flex; align-items: center; gap: 5px; font-family: inherit;
+    font-size: 12px; font-weight: 600; color: var(--muted); background: transparent;
+    border: none; border-radius: 7px; padding: 4px 11px; cursor: pointer;
+  }
+  .md-tabtoggle button.on { background: var(--panel); color: var(--violet); box-shadow: var(--shadow-card); }
+  .md-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .md-table th {
+    text-align: left; font-weight: 700; color: var(--muted); font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 6px 10px; border-bottom: 2px solid var(--line);
+  }
+  .md-table td { padding: 6px 10px; border-bottom: 1px solid var(--line-2); color: var(--ink-2); }
+  .md-table td.num { text-align: right; font-family: "JetBrains Mono", monospace; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  .md-table tbody tr:last-child td { border-bottom: none; }
+  .md-table tbody tr:hover { background: var(--hover); }
+
+  .md-chart { display: flex; flex-direction: column; gap: 9px; padding: 3px 0 2px; }
+  .md-chrow { display: grid; grid-template-columns: minmax(70px, 130px) 1fr auto; align-items: center; gap: 10px; }
+  .md-chlab { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .md-chtrack { height: 9px; background: var(--inset); border-radius: 6px; overflow: hidden; }
+  .md-chtrack i { display: block; height: 100%; background: linear-gradient(90deg, #7b54ee, #5a2fe0); border-radius: 6px; }
+  .md-chval { font-size: 12px; font-weight: 700; color: var(--violet); white-space: nowrap; font-family: "JetBrains Mono", monospace; }
+
   .as-pdf {
     display: inline-flex; align-items: center; gap: 7px; margin-top: 12px;
     font-family: inherit; font-size: 13px; font-weight: 700; color: #fff; cursor: pointer;

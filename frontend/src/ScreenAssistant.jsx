@@ -23,21 +23,99 @@ function renderInline(text) {
   });
 }
 
+/* pt-BR: "R$ 1.477.898,11" -> 1477898.11 · "55%" -> 55 */
+function parseNum(s) {
+  const raw = String(s).replace(/[^\d,.-]/g, "");
+  if (!raw) return null;
+  const n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
+  return Number.isNaN(n) ? null : n;
+}
+
+/* tabela renderizada + toggle Tabela/Gráfico (barras horizontais) */
+function MdTable({ rows }) {
+  const [chart, setChart] = useState(false);
+  if (!rows.length) return null;
+  const header = rows[0];
+  const body = rows.slice(1);
+  const ncols = header.length;
+  const isNumCol = (c) => body.length && body.filter((r) => parseNum(r[c]) != null).length > body.length / 2;
+  let valCol = ncols - 1;
+  for (let c = ncols - 1; c >= 0; c--) { if (isNumCol(c)) { valCol = c; break; } }
+  let labCol = 0;
+  for (let c = 0; c < ncols; c++) { if (!isNumCol(c)) { labCol = c; break; } }
+  const data = body
+    .map((r) => ({ label: r[labCol], raw: r[valCol], val: parseNum(r[valCol]) }))
+    .filter((d) => d.val != null);
+  const canChart = data.length >= 2;
+  const max = Math.max(...data.map((d) => Math.abs(d.val)), 1);
+
+  return (
+    <div className="md-tablewrap">
+      {canChart && (
+        <div className="md-tabtoggle">
+          <button type="button" className={chart ? "" : "on"} onClick={() => setChart(false)}>
+            <Icon name="variants" size={13} /> Tabela
+          </button>
+          <button type="button" className={chart ? "on" : ""} onClick={() => setChart(true)}>
+            <Icon name="hbars" size={13} /> Gráfico
+          </button>
+        </div>
+      )}
+      {chart ? (
+        <div className="md-chart">
+          {data.map((d, i) => (
+            <div className="md-chrow" key={i}>
+              <span className="md-chlab" title={d.label}>{d.label}</span>
+              <span className="md-chtrack"><i style={{ width: (100 * Math.abs(d.val) / max) + "%" }} /></span>
+              <span className="md-chval">{d.raw}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <table className="md-table">
+          <thead><tr>{header.map((c, i) => <th key={i}>{renderInline(c)}</th>)}</tr></thead>
+          <tbody>
+            {body.map((r, ri) => (
+              <tr key={ri}>{r.map((c, ci) => <td key={ci} className={isNumCol(ci) ? "num" : ""}>{renderInline(c)}</td>)}</tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+const _isTableRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+const _cellsOf = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+const _isSep = (cells) => cells.length > 0 && cells.every((c) => /^:?-{2,}:?$/.test(c) || c === "");
+
 function Markdown({ text }) {
   const lines = String(text ?? "").replace(/\r\n/g, "\n").split("\n");
   const blocks = [];
-  let list = null;
-  const flush = () => { if (list) { blocks.push(list); list = null; } };
+  let list = null, table = null;
+  const flush = () => {
+    if (list) { blocks.push(list); list = null; }
+    if (table) { blocks.push(table); table = null; }
+  };
   for (const raw of lines) {
     const line = raw.replace(/\s+$/, "");
+    if (_isTableRow(line)) {
+      const cells = _cellsOf(line);
+      if (list) { blocks.push(list); list = null; }
+      if (!table) table = { type: "table", rows: [] };
+      if (!_isSep(cells)) table.rows.push(cells);
+      continue;
+    }
     const ul = line.match(/^\s*[-•*]\s+(.*)$/);
     const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
     const h  = line.match(/^(#{1,3})\s+(.*)$/);
     if (ul) {
-      if (!list || list.type !== "ul") { flush(); list = { type: "ul", items: [] }; }
+      if (table) { blocks.push(table); table = null; }
+      if (!list || list.type !== "ul") { if (list) blocks.push(list); list = { type: "ul", items: [] }; }
       list.items.push(ul[1]);
     } else if (ol) {
-      if (!list || list.type !== "ol") { flush(); list = { type: "ol", items: [] }; }
+      if (table) { blocks.push(table); table = null; }
+      if (!list || list.type !== "ol") { if (list) blocks.push(list); list = { type: "ol", items: [] }; }
       list.items.push(ol[1]);
     } else if (h) {
       flush(); blocks.push({ type: "h", level: h[1].length, text: h[2] });
@@ -51,6 +129,7 @@ function Markdown({ text }) {
   return (
     <div className="md">
       {blocks.map((b, i) => {
+        if (b.type === "table") return <MdTable key={i} rows={b.rows} />;
         if (b.type === "ul") return <ul key={i} className="md-ul">{b.items.map((it, j) => <li key={j}>{renderInline(it)}</li>)}</ul>;
         if (b.type === "ol") return <ol key={i} className="md-ol">{b.items.map((it, j) => <li key={j}>{renderInline(it)}</li>)}</ol>;
         if (b.type === "h")  return <div key={i} className={"md-h md-h" + b.level}>{renderInline(b.text)}</div>;
