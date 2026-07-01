@@ -21,13 +21,14 @@ class BiolabModule(PMModule):
     ]
     CANCEL = {
         "Cancelar Requisição", "Requisição Rejeitada", "Cancelar Pedido",
-        "Pedido Rejeitado", "Cancelar Entrada", "Estornar Recebimento",
-        "Estornar Voucher - Re",
+        "Cancelar Pedido Blank", "Pedido Rejeitado", "Cancelar Entrada",
+        "Estornar Recebimento", "Estornar Voucher - Re",
     }
     BRANCH_PARENT = {
         "Cancelar Requisição": "Entrar Requisição",
         "Requisição Rejeitada": "Entrar Requisição",
         "Cancelar Pedido": "Entrar Pedido de Comp",
+        "Cancelar Pedido Blank": "Entrar Pedido de Comp",
         "Pedido Rejeitado": "Entrar Pedido de Comp",
         "Cancelar Entrada": "Entrar Nota Fiscal de",
         "Estornar Recebimento": "Recebimento",
@@ -39,8 +40,8 @@ class BiolabModule(PMModule):
         "Alterar Data Real Rem", "Alterar Data Solicita", "Alterar Endereço Entr",
         "Alterar Unidade Negóc", "Ajuste Resíduos Saldo",
         "Cancelar Requisição", "Requisição Rejeitada", "Cancelar Pedido",
-        "Pedido Rejeitado", "Cancelar Entrada", "Estornar Recebimento",
-        "Estornar Voucher - Re",
+        "Cancelar Pedido Blank", "Pedido Rejeitado", "Cancelar Entrada",
+        "Estornar Recebimento", "Estornar Voucher - Re",
     }
     PED = "Entrar Pedido de Comp"
     FAT = "Entrar Nota Fiscal de"

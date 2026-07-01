@@ -151,8 +151,10 @@ class PMModule(ProcessModule):
             "headlineKpis": self._safe(lambda: self._headline(log, total_cases), []),
             "overview": self._safe(lambda: self._overview(log), {}),
             "rework": self._safe(
+                # toda atividade de retrabalho conta cada ocorrência (cancelamentos
+                # E alterações), não só os cancelamentos. Cordeiro: REWORK_ACTS = CANCEL.
                 lambda: rework(log, "cliente", labels, top=60,
-                           also_rework_acts=CANCEL, allowed_acts=self.REWORK_ACTS), {}),
+                           also_rework_acts=self.REWORK_ACTS, allowed_acts=self.REWORK_ACTS), {}),
             "twoMatch": self._safe(
                 lambda: two_match(log, "cliente", invoice_activity=self.FAT, order_activity=self.PED),
                 {"monthly": [], "pendentes": []}),
