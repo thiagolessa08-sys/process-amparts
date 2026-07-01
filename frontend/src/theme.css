@@ -721,7 +721,7 @@
   }
   .as-chip:hover { border-color: var(--violet); color: var(--violet); background: var(--violet-50); }
 
-  .as-msg { display: flex; gap: 11px; max-width: 760px; margin: 0 auto 18px; align-items: flex-start; }
+  .as-msg { display: flex; gap: 11px; width: 100%; max-width: 760px; margin: 0 auto 18px; align-items: flex-start; }
   .as-msg.user { flex-direction: row-reverse; }
   .as-av {
     width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
@@ -730,7 +730,7 @@
   }
   .as-bubble {
     background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-    padding: 12px 15px; box-shadow: var(--shadow-card); max-width: 82%;
+    padding: 12px 15px; box-shadow: var(--shadow-card); max-width: 82%; min-width: 0;
   }
   .as-msg.user .as-bubble {
     background: linear-gradient(135deg, #6a40ea, #5a2fe0); border-color: transparent; color: #fff;
