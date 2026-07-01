@@ -762,6 +762,15 @@
     border-radius: 5px; padding: 1px 5px;
   }
 
+  .as-pdf {
+    display: inline-flex; align-items: center; gap: 7px; margin-top: 12px;
+    font-family: inherit; font-size: 13px; font-weight: 700; color: #fff; cursor: pointer;
+    background: linear-gradient(135deg, #6a40ea, #5a2fe0); border: none;
+    border-radius: 10px; padding: 8px 14px; box-shadow: 0 4px 14px -5px rgba(90,47,224,.6);
+    transition: transform .1s;
+  }
+  .as-pdf:hover { transform: translateY(-1px); }
+
   .as-steps { margin-top: 10px; border-top: 1px solid var(--line-2); padding-top: 8px; }
   .as-steps-toggle {
     display: flex; align-items: center; gap: 7px; width: 100%;

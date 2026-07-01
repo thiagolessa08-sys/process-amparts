@@ -77,6 +77,23 @@ function QueryResult({ table }) {
   );
 }
 
+function PdfDownload({ b64, name }) {
+  if (!b64) return null;
+  function download() {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = name || "relatorio.pdf";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  return (
+    <button className="as-pdf" onClick={download}>
+      <Icon name="arrowDown" size={15} /> Baixar PDF
+    </button>
+  );
+}
+
 function Steps({ steps }) {
   const [open, setOpen] = useState(false);
   if (!steps?.length) return null;
@@ -113,7 +130,7 @@ export function AssistantScreen({ data, filters }) {
     setLoading(true);
     try {
       const res = await askAssistant(data.key, q, filters);
-      setMessages((m) => [...m, { role: "assistant", text: res.answer, steps: res.steps }]);
+      setMessages((m) => [...m, { role: "assistant", text: res.answer, steps: res.steps, pdf: res.pdf, pdfName: res.pdfName }]);
     } catch (e) {
       setMessages((m) => [...m, { role: "assistant", text: `⚠️ ${e.message}`, error: true }]);
     } finally {
@@ -149,6 +166,7 @@ export function AssistantScreen({ data, filters }) {
                 ? <div className="as-text as-md"><Markdown text={m.text} /></div>
                 : <div className="as-text">{m.text}</div>}
               {m.role === "assistant" && <Steps steps={m.steps} />}
+              {m.role === "assistant" && <PdfDownload b64={m.pdf} name={m.pdfName} />}
             </div>
           </div>
         ))}

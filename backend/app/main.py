@@ -1,6 +1,8 @@
+import base64
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -500,9 +502,22 @@ def ask_module(
     dim_label = "Fornecedor" if "fornecedor" in log.columns else (
         "Cliente" if "cliente" in log.columns else "Dimensão")
     try:
-        return ask(body.question, log, module.name, dim_label)
+        result = ask(body.question, log, module.name, dim_label)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"Falha ao consultar a IA: {exc}")
+
+    # se o pedido menciona "pdf", monta um relatório em PDF (base64) p/ download.
+    # É opcional: qualquer falha aqui não derruba a resposta em texto.
+    if re.search(r"\bpdf\b", body.question, re.IGNORECASE):
+        try:
+            from app.ai.report_pdf import build_pdf
+            pdf_bytes = build_pdf(module.name, body.question,
+                                  result.get("answer", ""), result.get("steps"))
+            result["pdf"] = base64.b64encode(pdf_bytes).decode("ascii")
+            result["pdfName"] = f"relatorio-{key}.pdf"
+        except Exception as exc:  # noqa: BLE001
+            result["pdfError"] = str(exc)
+    return result
 
 
 @app.get("/api/modules/{key}/user/{name}", dependencies=[Depends(require_module_access)])

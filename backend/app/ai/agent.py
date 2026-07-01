@@ -75,7 +75,11 @@ def _schema_text(log: pd.DataFrame, module_name: str, dim_label: str) -> str:
         "resultado a `result`. Pense em métricas por caso quando fizer sentido "
         f"(ex.: agrupar por `{CASE_ID}`). Após obter os dados, responda em **português**, "
         "de forma concisa e objetiva, citando os números. Não invente dados: baseie-se "
-        "apenas no que a consulta retornou."
+        "apenas no que a consulta retornou.\n"
+        "Se o usuário pedir um **relatório** ou **PDF**, faça uma análise mais completa "
+        "(rode as consultas necessárias) e estruture a resposta com títulos em markdown "
+        "(`##` seção, `###` subseção): ex. Visão geral, Principais clientes/produtos, "
+        "Retrabalho/cancelamentos, Riscos e Resumo — cada um com bullets e os números."
     )
 
 
