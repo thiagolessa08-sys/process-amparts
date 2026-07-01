@@ -501,22 +501,29 @@ def ask_module(
 
     dim_label = "Fornecedor" if "fornecedor" in log.columns else (
         "Cliente" if "cliente" in log.columns else "Dimensão")
+    wants_report = bool(re.search(r"\b(pdf|relat[óo]rios?)\b", body.question, re.IGNORECASE))
     try:
-        result = ask(body.question, log, module.name, dim_label)
+        result = ask(body.question, log, module.name, dim_label, allow_report=wants_report)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"Falha ao consultar a IA: {exc}")
 
-    # se o pedido menciona "pdf", monta um relatório em PDF (base64) p/ download.
-    # É opcional: qualquer falha aqui não derruba a resposta em texto.
-    if re.search(r"\bpdf\b", body.question, re.IGNORECASE):
+    # relatório/PDF: monta o PDF (base64) para download. Se a IA emitiu o relatório
+    # estruturado, usa o template rico; senão cai no PDF simples. Falha aqui não
+    # derruba a resposta em texto.
+    if wants_report:
         try:
-            from app.ai.report_pdf import build_pdf
-            pdf_bytes = build_pdf(module.name, body.question,
-                                  result.get("answer", ""), result.get("steps"))
+            from app.ai.report_pdf import build_pdf, build_report_pdf
+            rep = result.pop("report", None)
+            if rep:
+                pdf_bytes = build_report_pdf(rep, module.name)
+            else:
+                pdf_bytes = build_pdf(module.name, body.question,
+                                      result.get("answer", ""), result.get("steps"))
             result["pdf"] = base64.b64encode(pdf_bytes).decode("ascii")
             result["pdfName"] = f"relatorio-{key}.pdf"
         except Exception as exc:  # noqa: BLE001
             result["pdfError"] = str(exc)
+    result.pop("report", None)
     return result
 
 

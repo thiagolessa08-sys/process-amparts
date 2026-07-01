@@ -35,6 +35,59 @@ _RUN_QUERY_TOOL = {
     },
 }
 
+_REPORT_TOOL = {
+    "name": "emit_report",
+    "description": (
+        "Emite o RELATÓRIO final estruturado (vira um PDF bonito). Chame UMA única "
+        "vez, DEPOIS de coletar os números com run_query. Não responda em texto — "
+        "preencha os campos. Use rótulos e valores já formatados (ex.: 'R$ 12.345,67')."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string", "description": "título curto, ex.: 'Vendas em Aberto'"},
+            "subtitle": {"type": "string", "description": "período/escopo, ex.: 'Junho de 2026'"},
+            "definition": {"type": "string", "description": "1 frase com o critério adotado"},
+            "kpis": {
+                "type": "array", "description": "3 a 4 indicadores principais",
+                "items": {"type": "object", "properties": {
+                    "label": {"type": "string"}, "value": {"type": "string"},
+                    "sub": {"type": "string"}, "highlight": {"type": "boolean"},
+                }, "required": ["label", "value"]},
+            },
+            "composition": {
+                "type": "object", "description": "barra de composição (opcional)",
+                "properties": {
+                    "label": {"type": "string"}, "total": {"type": "string"},
+                    "segments": {"type": "array", "items": {"type": "object", "properties": {
+                        "label": {"type": "string"}, "value": {"type": "number"},
+                        "color": {"type": "string", "enum": ["green", "violet", "red", "amber", "gray"]},
+                    }}},
+                },
+            },
+            "bars": {
+                "type": "array", "description": "1 ou 2 painéis de ranking (top clientes, vendedores…)",
+                "items": {"type": "object", "properties": {
+                    "title": {"type": "string"}, "subtitle": {"type": "string"},
+                    "items": {"type": "array", "items": {"type": "object", "properties": {
+                        "label": {"type": "string"}, "value": {"type": "string"}, "amount": {"type": "number"},
+                    }}},
+                    "note": {"type": "string"},
+                }},
+            },
+            "risks": {
+                "type": "array", "description": "2 a 3 riscos/recomendações",
+                "items": {"type": "object", "properties": {
+                    "title": {"type": "string"}, "text": {"type": "string"},
+                    "tone": {"type": "string", "enum": ["red", "amber", "green", "violet"]},
+                }},
+            },
+            "summary": {"type": "string", "description": "1 a 2 frases de fechamento"},
+        },
+        "required": ["title", "kpis", "summary"],
+    },
+}
+
 _BANNED = ("__", "import", "open(", "exec(", "eval(", "compile(",
            "os.", "sys.", "subprocess", "globals(", "locals(", "getattr", "setattr")
 
@@ -132,18 +185,28 @@ def _safe_run(df: pd.DataFrame, code: str):
     return txt, table, None
 
 
-def ask(question: str, log: pd.DataFrame, module_name: str, dim_label: str) -> dict:
+def ask(question: str, log: pd.DataFrame, module_name: str, dim_label: str,
+        allow_report: bool = False) -> dict:
     client = _build_client()
     system = _schema_text(log, module_name, dim_label)
+    if allow_report:
+        system += (
+            "\n\nO usuário pediu um RELATÓRIO/PDF. Colete os dados necessários com "
+            "run_query (KPIs do período, rankings por cliente/vendedor, composição, "
+            "cancelamentos/retrabalho) e então chame **emit_report** UMA vez com o "
+            "relatório estruturado (KPIs, composição, barras, riscos e resumo). "
+            "Traga insights e recomendações acionáveis. NÃO responda em texto."
+        )
+    tools = [_RUN_QUERY_TOOL] + ([_REPORT_TOOL] if allow_report else [])
     messages = [{"role": "user", "content": question}]
     steps: list[dict] = []
 
-    for _ in range(MAX_STEPS):
+    for _ in range(MAX_STEPS + (3 if allow_report else 0)):
         resp = client.messages.create(
             model=MODEL,
             max_tokens=4000,
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-            tools=[_RUN_QUERY_TOOL],
+            tools=tools,
             thinking={"type": "adaptive"},
             output_config={"effort": "medium"},
             messages=messages,
@@ -152,17 +215,25 @@ def ask(question: str, log: pd.DataFrame, module_name: str, dim_label: str) -> d
         if resp.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": resp.content})
             tool_results = []
+            report = None
             for block in resp.content:
-                if block.type == "tool_use" and block.name == "run_query":
+                if block.type != "tool_use":
+                    continue
+                if block.name == "emit_report":
+                    report = block.input
+                    tool_results.append({"type": "tool_result", "tool_use_id": block.id,
+                                         "content": "Relatório recebido."})
+                elif block.name == "run_query":
                     code = block.input.get("code", "")
                     txt, table, err = _safe_run(log, code)
                     steps.append({"code": code, "table": table, "error": err})
                     tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": err or txt or "(sem resultado)",
-                        "is_error": bool(err),
+                        "type": "tool_result", "tool_use_id": block.id,
+                        "content": err or txt or "(sem resultado)", "is_error": bool(err),
                     })
+            if report is not None:
+                summary = report.get("summary") or "Relatório gerado."
+                return {"answer": summary, "steps": steps, "report": report}
             messages.append({"role": "user", "content": tool_results})
             continue
 
