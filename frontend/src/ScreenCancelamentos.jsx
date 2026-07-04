@@ -53,6 +53,7 @@ function Bars({ items, labelKey = "nome", byKey = "valor", fmt = fmtMoney, sub, 
 
 export function CancelamentosScreen({ data }) {
   const c = data.cancelamentos || {};
+  const dim = data.dimension || "Cliente";
   const meses = c.porMes || [];
   const maxMes = Math.max(...meses.map((m) => m.qtd || 0), 1);
 
@@ -91,7 +92,7 @@ export function CancelamentosScreen({ data }) {
       </Panel>
 
       <div className="cnc-grid2">
-        <Panel title="Top clientes que cancelam" sub="por nº de casos cancelados" icon="variants" meta="Cliente">
+        <Panel title={`Top ${dim.toLowerCase()} que mais cancela`} sub="por nº de casos cancelados" icon="variants" meta={dim}>
           <Bars items={c.topClientes || []} labelKey="nome" byKey="casos" fmt={fmtInt} color="#e5484d"
             sub={(it) => ` · ${fmtMoney(it.valor)}`} />
         </Panel>
