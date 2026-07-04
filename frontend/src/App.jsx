@@ -5,6 +5,7 @@ import { VariantsScreen } from "./ScreenVariants.jsx";
 import { DashboardScreen } from "./ScreenDashboard.jsx";
 import { OverviewScreen } from "./ScreenOverview.jsx";
 import { ReworkScreen } from "./ScreenRework.jsx";
+import { CancelamentosScreen } from "./ScreenCancelamentos.jsx";
 import { CaseExplorerScreen } from "./ScreenCaseExplorer.jsx";
 import { DetailsScreen } from "./ScreenDetails.jsx";
 import { AssistantScreen } from "./ScreenAssistant.jsx";
@@ -18,6 +19,7 @@ const SCREENS = [
   { id: "variants", label: "Variantes",  icon: "variants" },
   { id: "dashboard", label: "Dashboard", icon: "activity" },
   { id: "rework", label: "Retrabalho", icon: "loop" },
+  { id: "cancel", label: "Cancelamentos", icon: "close" },
   { id: "twomatch", label: "2 Way Match", icon: "shield" },
   { id: "userprod", label: "Produtividade", icon: "variants" },
   { id: "overview", label: "Visão Geral", icon: "dashboard" },
@@ -302,6 +304,7 @@ export default function App() {
     variants:  { title: "Variantes do Processo",  sub: <><b>{data.avgVariants}</b> caminhos distintos do início ao fim</> },
     dashboard: { title: "Dashboard de KPIs & Alertas", sub: <>Visão financeira — <b>{data.name}</b></> },
     rework:    { title: "Análise de Retrabalho", sub: <><b>{data.rework?.pctComRetrabalho ?? 0}%</b> dos casos com retrabalho</> },
+    cancel:    { title: "Análise de Cancelamentos", sub: <><b>{data.cancelamentos?.pctCancel ?? 0}%</b> dos casos com cancelamento</> },
     twomatch:  { title: "2 Way Match", sub: <>Pedido × Faturamento</> },
     userprod:  { title: "Produtividade de Usuário", sub: <>Atividade por usuário (recurso)</> },
     cases:     { title: "Case Explorer", sub: <>Explore casos individuais — <b>{data.totalCases.toLocaleString("pt-BR")}</b> casos</> },
@@ -412,6 +415,7 @@ export default function App() {
             <>
               {screen === "overview" && <div className="screen-fill" style={{ overflowY: "auto" }}><OverviewScreen key={moduleKey} data={data} /></div>}
               {screen === "rework" && <div className="screen-fill"><ReworkScreen key={moduleKey} data={data} /></div>}
+              {screen === "cancel" && <div className="screen-fill" style={{ overflowY: "auto" }}><CancelamentosScreen key={moduleKey} data={data} /></div>}
               {screen === "twomatch" && <div className="screen-fill" style={{ overflowY: "auto" }}><TwoMatchScreen key={moduleKey} data={data} /></div>}
               {screen === "userprod" && <div className="screen-fill" style={{ overflowY: "auto" }}><UserProdScreen key={moduleKey} data={data} filters={filters} /></div>}
               {screen === "cases" && <div className="screen-fill"><CaseExplorerScreen key={moduleKey} data={data} filters={filters} /></div>}

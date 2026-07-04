@@ -29,6 +29,7 @@ class CordeiroModule(PMModule):
         "CANCELOU FATURA": "CRIOU FATURA",
         "CANCELOU PAGAMENTO": "PAGOU FATURA",
     }
+    REVERSAL_ACTS = {"DEVOLUÇÃO FATURA"}   # entra na análise de cancelamentos
     PED = "CRIOU PEDIDO"
     FAT = "CRIOU FATURA"
     order_activity = PED                 # filtro de período usa a data do pedido

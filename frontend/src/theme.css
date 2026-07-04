@@ -795,6 +795,35 @@
   .md-chtrack i { display: block; height: 100%; background: linear-gradient(90deg, #7b54ee, #5a2fe0); border-radius: 6px; }
   .md-chval { font-size: 12px; font-weight: 700; color: var(--violet); white-space: nowrap; font-family: "JetBrains Mono", monospace; }
 
+  /* ============ Cancelamentos ============ */
+  .cnc { padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; max-width: 1640px; margin: 0 auto; }
+  .cnc-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .cnc-kpi { display: flex; align-items: center; gap: 13px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow-card); }
+  .cnc-kpi-ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: var(--violet-100); color: var(--violet); flex: none; }
+  .cnc-kpi.red .cnc-kpi-ic { background: var(--red-soft); color: var(--red); }
+  .cnc-kpi-txt { min-width: 0; }
+  .cnc-kpi-label { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .cnc-kpi-value { font-size: 23px; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; margin-top: 1px; white-space: nowrap; }
+  .cnc-kpi.red .cnc-kpi-value { color: var(--red); }
+  .cnc-kpi-sub { font-size: 11px; color: var(--faint); margin-top: 1px; }
+  .cnc-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .cnc-psub { font-size: 11.5px; color: var(--muted); margin-left: 8px; }
+  .cnc-body { padding: 14px 16px 16px; }
+  .cnc-empty { color: var(--muted); font-size: 12.5px; padding: 8px 0; }
+  .cnc-bars { display: flex; flex-direction: column; gap: 11px; }
+  .cnc-barrow { display: grid; grid-template-columns: minmax(90px, 200px) 1fr auto; align-items: center; gap: 12px; }
+  .cnc-barlab { font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cnc-bartrack { height: 10px; background: var(--inset); border-radius: 6px; overflow: hidden; }
+  .cnc-bartrack i { display: block; height: 100%; border-radius: 6px; }
+  .cnc-barval { font-size: 12.5px; font-weight: 700; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cnc-barval em { font-style: normal; font-weight: 500; color: var(--muted); font-size: 11px; }
+  .cnc-months { display: flex; align-items: stretch; gap: 8px; height: 168px; padding-top: 4px; }
+  .cnc-mcol { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+  .cnc-mval { font-size: 10.5px; font-weight: 700; color: var(--ink-2); }
+  .cnc-mbarwrap { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+  .cnc-mbar { display: block; width: 62%; max-width: 34px; background: linear-gradient(180deg, #ef5e62, #e5484d); border-radius: 5px 5px 0 0; }
+  .cnc-mlab { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
   .as-pdf {
     display: inline-flex; align-items: center; gap: 7px; margin-top: 12px;
     font-family: inherit; font-size: 13px; font-weight: 700; color: #fff; cursor: pointer;

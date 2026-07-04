@@ -11,6 +11,7 @@ from app.mining.variants import discover_variants
 from app.mining.activity_stats import activity_metrics
 from app.modules.headline import _fmt_compact, _spark, period_filters, case_ref_date
 from app.modules.rework import rework
+from app.modules.cancel import cancel_analysis
 from app.modules.twomatch import two_match
 from app.modules.userprod import user_productivity
 from app.eventlog import CASE_ID, TIMESTAMP
@@ -39,6 +40,7 @@ class PMModule(ProcessModule):
     CANCEL: set = set()
     BRANCH_PARENT: dict = {}
     REWORK_ACTS: set = set()
+    REVERSAL_ACTS: set = set()   # devoluções/estornos (entram na análise de cancelamento)
     PED = ""
     FAT = ""
     order_activity = None
@@ -155,6 +157,8 @@ class PMModule(ProcessModule):
                 # E alterações), não só os cancelamentos. Cordeiro: REWORK_ACTS = CANCEL.
                 lambda: rework(log, "cliente", labels, top=60,
                            also_rework_acts=self.REWORK_ACTS, allowed_acts=self.REWORK_ACTS), {}),
+            "cancelamentos": self._safe(
+                lambda: cancel_analysis(log, self.CANCEL | self.REVERSAL_ACTS, labels), {}),
             "twoMatch": self._safe(
                 lambda: two_match(log, "cliente", invoice_activity=self.FAT, order_activity=self.PED),
                 {"monthly": [], "pendentes": []}),
