@@ -141,14 +141,28 @@ def load_vedara_eventlog(conn: AgentConnector | None = None, progress=None) -> p
     })
     log = log.dropna(subset=["timestamp"])
 
-    # valor por caso (soma do valor de item dos orçamentos do caso)
+    # valor por caso (soma do valor de item dos orçamentos do caso) + campos p/
+    # os 3 KPIs do Veddara (Qtde Unidades / Valor Orçado / Valor Faturado). O
+    # Veddara só tem um valor (VL_ORC_TOTAL_ITEM); o "faturado" é esse mesmo
+    # valor, mas só dos casos que chegaram à nota (NR_INVOICE preenchido).
     if not cases.empty:
-        val = (cases.assign(_k=cases["_CASE_KEY_O2C"].astype(str),
-                            _v=_num(cases["VL_ORC_TOTAL_ITEM"]).fillna(0.0))
-                    .groupby("_k")["_v"].sum())
-        log["valor"] = log["case_id"].map(val).fillna(0.0)
+        _k = cases["_CASE_KEY_O2C"].astype(str)
+        _vl = _num(cases["VL_ORC_TOTAL_ITEM"]).fillna(0.0)
+        _qt = _num(cases["QT_ORC_ITEM"]).fillna(0.0)
+        _inv = cases["NR_INVOICE"].astype(str).str.strip()
+        _faturado = cases["NR_INVOICE"].notna() & ~_inv.isin(["", "0", "None", "nan"])
+
+        def _by(series):
+            return log["case_id"].map(
+                cases.assign(_k=_k, _v=series).groupby("_k")["_v"].sum()).fillna(0.0)
+
+        log["valor"] = _by(_vl)
+        log["qtde_un"] = _by(_qt)
+        log["fat_total"] = _by(_vl.where(_faturado, 0.0))
     else:
         log["valor"] = 0.0
+        log["qtde_un"] = 0.0
+        log["fat_total"] = 0.0
 
     log = log.sort_values(["case_id", "timestamp"]).reset_index(drop=True)
     return log

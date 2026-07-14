@@ -1,6 +1,8 @@
 """Módulo Veddara-O2C (O2C real) — veddara.SQL_PM_ATIVIDADES + SQL_PM_CASES.
 Caminho feliz Orçamento → Pedido → Fatura; cancelamentos viram ramos.
 """
+from app.eventlog import CASE_ID
+from app.modules.headline import _fmt_compact, _spark
 from app.modules.pm_base import PMModule
 
 
@@ -26,3 +28,22 @@ class VedaraModule(PMModule):
     FAT = "CRIACAO DA FATURA"
     order_activity = PED                 # filtro de período usa a data do pedido
     cancel_month_activity = "CANCELAMENTO DO PEDIDO"
+
+    def _headline(self, log, total_cases):
+        """3 KPIs do Veddara (base orçamento-cêntrica, sem valor de pedido/pago):
+        Qtde Unidades, Valor Orçado e Valor Faturado."""
+        first = log.groupby(CASE_ID).first()
+
+        def soma(col):
+            return float(first[col].sum()) if col in first.columns else 0.0
+
+        kpis = [
+            ("qtdeun", "Qtde Unidades", "itens", "layers", soma("qtde_un"), ""),
+            ("valorc", "Valor Orçado", "pedidos", "cart", soma("valor"), "R$"),
+            ("valfat", "Valor Faturado", "valortotal", "dollar", soma("fat_total"), "R$"),
+        ]
+        return [
+            {"id": i, "label": lbl, "accent": acc, "icon": ic,
+             "value": _fmt_compact(v), "unit": u, "delta": "", "spark": _spark(v)}
+            for i, lbl, acc, ic, v, u in kpis
+        ]
