@@ -7,8 +7,8 @@ import pandas as pd
 from ..connectors.agent_connector import AgentConnector
 
 SCHEMA = "biolab"
-ACT_TABLE = f"{SCHEMA}.SQL_PM_ATIVIDADES"
-CASE_TABLE = f"{SCHEMA}.SQL_PM_CASES"
+ACT_TABLE = f"{SCHEMA}.TB_BIOLAB_CELONIS_EXPORT_ACTIVITIES"
+CASE_TABLE = f"{SCHEMA}.TB_BIOLAB_CELONIS_EXPORT_CASE"
 DADOS_TABLE = f"{SCHEMA}.SQL_PM_DADOS"
 
 # recorte: de 2025 até a data atual (exclui histórico antigo e datas futuras/inválidas)
