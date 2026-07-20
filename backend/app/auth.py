@@ -19,6 +19,9 @@ DEFAULT_USERS = [
      "pass_sha256": "ed9d8e8c9652426151cc9d1a6b3f59e06f71b0d1bab44eda57621ee5c369b873"},
     {"email": "biolab@fluxo.com", "name": "Biolab", "modules": ["biolab"],
      "pass_sha256": "da13ef6f75dab6c675b1fbcd13b61eb5954b44ef8a0ff82398d8665184f1ec85"},
+    {"email": "biolab.chat@fluxo.com", "name": "Biolab Chat", "modules": ["biolab"],
+     "screens": ["assistant"],
+     "pass_sha256": "c3e7f5b672a8fd0dca1c33dc086f12c781e73f8382eaf237d8dc545ce858cbae"},
     {"email": "cordeiro@fluxo.com", "name": "Cordeiro", "modules": ["cordeiro"],
      "pass_sha256": "953dc82f1be1752afcf6b22b75e895eb99c393d54cf14e5f77e0008e53fb9c3d"},
     {"email": "admin@fluxo.com", "name": "Admin", "modules": ["vedara", "biolab", "cordeiro"],
@@ -80,10 +83,15 @@ def user_from_token(token: str | None) -> dict | None:
 
 
 def public_user(u: dict) -> dict:
-    """Dados do usuário para o frontend (sem o hash)."""
+    """Dados do usuário para o frontend (sem o hash).
+
+    `screens`: allow-list opcional de telas (ids do frontend). Vazio = todas as
+    telas liberadas; ex.: ["assistant"] libera só o chat.
+    """
     return {
         "email": u.get("email"),
         "name": u.get("name") or str(u.get("email", "")).split("@")[0],
         "modules": list(u.get("modules", [])),
+        "screens": list(u.get("screens", [])),
         "token": make_token(u.get("email", "")),
     }

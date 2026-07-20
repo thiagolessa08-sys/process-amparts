@@ -214,7 +214,10 @@ function Toast({ msg }) {
 export default function App() {
   const [auth, setAuth]       = useState(() => readAuth());
   const [moduleKey, setModuleKey] = useState(() => readAuth()?.modules?.[0] || "vedara");
-  const [screen, setScreen]   = useState("explorer");
+  const [screen, setScreen]   = useState(() => {
+    const s = readAuth()?.screens;
+    return s?.length ? s[0] : "explorer";   // usuário restrito cai na 1ª tela liberada
+  });
   const [dark, setDark]       = useTheme();
   const [drill, setDrill]     = useState(null);
   const [toast, setToast]     = useState("");
@@ -264,6 +267,17 @@ export default function App() {
     yearDefaulted.current = null; setFilters(EMPTY_FILTERS); load(moduleKey, EMPTY_FILTERS);
   }, [moduleKey, load, auth]);
   useEffect(() => { setDrill(null); }, [moduleKey, screen]);
+
+  // telas liberadas p/ o usuário (allow-list opcional; vazio = todas). Se a tela
+  // atual não estiver na lista, cai na 1ª liberada (ex.: usuário só-chat).
+  const allowedScreens = (auth?.screens?.length)
+    ? SCREENS.filter((s) => auth.screens.includes(s.id))
+    : SCREENS;
+  useEffect(() => {
+    if (allowedScreens.length && !allowedScreens.some((s) => s.id === screen)) {
+      setScreen(allowedScreens[0].id);
+    }
+  }, [allowedScreens, screen]);
 
   const onFiltersChange = useCallback((f) => { setFilters(f); load(moduleKey, f); }, [moduleKey, load]);
   const setFilter = useCallback((patch) => { onFiltersChange({ ...filters, ...patch }); }, [filters, onFiltersChange]);
@@ -317,7 +331,11 @@ export default function App() {
       <LoginScreen
         dark={dark}
         onToggleTheme={() => setDark((d) => !d)}
-        onLogin={(user) => { setAuth(user); setModuleKey(user.modules?.[0] || "vedara"); }}
+        onLogin={(user) => {
+          setAuth(user);
+          setModuleKey(user.modules?.[0] || "vedara");
+          setScreen(user.screens?.length ? user.screens[0] : "explorer");
+        }}
       />
     );
   }
@@ -362,7 +380,7 @@ export default function App() {
         {/* RAIL */}
         <nav className="rail">
           <div className="rail-eyebrow">Análise</div>
-          {SCREENS.map((s) => (
+          {allowedScreens.map((s) => (
             <div key={s.id} className={"nav-item" + (screen === s.id ? " on" : "")} onClick={() => setScreen(s.id)}>
               <Icon name={s.icon} size={17} />{s.label}
               {s.id === "variants" && data && <span className="nbadge">{data.avgVariants}</span>}
