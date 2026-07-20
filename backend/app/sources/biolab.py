@@ -1,6 +1,7 @@
-"""Event log Biolab (P2P/Compras, base JD Edwards) do schema `biolab`:
-SQL_PM_ATIVIDADES (eventos) + SQL_PM_CASES (atributos por caso) + SQL_PM_DADOS
-(detalhe para a tela Detalhes). Mapeia para o formato padrão do app.
+"""Event log Biolab (P2P/Compras, base JD Edwards) do export Celonis (schema
+`biolab`): TB_BIOLAB_CELONIS_EXPORT_ACTIVITIES (eventos) +
+TB_BIOLAB_CELONIS_EXPORT_CASE (atributos por caso + detalhe da tela Detalhes).
+Mapeia para o formato padrão do app.
 """
 import pandas as pd
 
@@ -9,7 +10,6 @@ from ..connectors.agent_connector import AgentConnector
 SCHEMA = "biolab"
 ACT_TABLE = f"{SCHEMA}.TB_BIOLAB_CELONIS_EXPORT_ACTIVITIES"
 CASE_TABLE = f"{SCHEMA}.TB_BIOLAB_CELONIS_EXPORT_CASE"
-DADOS_TABLE = f"{SCHEMA}.SQL_PM_DADOS"
 
 # recorte: de 2025 até a data atual (exclui histórico antigo e datas futuras/inválidas)
 DESDE = "2025-01-01"
@@ -19,7 +19,7 @@ def _periodo_where() -> str:
     hoje = pd.Timestamp.now().strftime("%Y-%m-%d")
     return f"EVENTTIME >= '{DESDE}' AND EVENTTIME <= '{hoje} 23:59:59'"
 
-# colunas da tela Detalhes (a partir da SQL_PM_DADOS)
+# colunas da tela Detalhes (a partir da TB_BIOLAB_CELONIS_EXPORT_CASE)
 DETAIL_COLS = [
     {"key": "documento", "label": "Documento", "fmt": "id"},
     {"key": "item", "label": "Item", "fmt": "id"},
@@ -81,31 +81,30 @@ def load_biolab_eventlog(conn: AgentConnector | None = None, progress=None) -> p
         on_rows=lambda n: progress(3 + 78 * min(n, total) / total))
     progress(82)
 
-    # atributos por caso (fornecedor/produto/valor) — uma linha por _CASE_KEY
+    # atributos por caso (fornecedor/produto/valor) + colunas da tela Detalhes —
+    # uma linha por _CASE_KEY, tudo da mesma CASE (aposenta a antiga SQL_PM_DADOS)
     cases = conn.paginate_offset(
-        "_CASE_KEY, PDAN8, PDDSC1, PDAEXP", CASE_TABLE, order="_CASE_KEY")
-    progress(88)
-
-    # detalhe (tela Detalhes) — SQL_PM_DADOS
-    dados = conn.paginate_offset(
-        "DOCUMENTO, LINHAITEM, EMISSAO, TIPODOCTO, FORNECEDOR, PRODUTO, "
-        "QUANTIDADE, PRECOUNITARIO, LIQUIDOPEDIDO, CANCELADO",
-        DADOS_TABLE, order="DOCUMENTO, LINHAITEM")
-    progress(93)
+        "_CASE_KEY, PDAN8, PDDSC1, PDAEXP, IC_TYPE, PDDOCO, PDDCTO, PDLNID, "
+        "PDUORG, PDPRRC, PDAEXP_CANCELADO, FDISSU_CONV",
+        CASE_TABLE, order="_CASE_KEY")
+    progress(90)
 
     global _CASES_DETAIL
-    if not dados.empty:
+    if not cases.empty:
+        _cancel = _num(cases["PDAEXP_CANCELADO"]).fillna(0.0)
         _CASES_DETAIL = pd.DataFrame({
-            "documento": dados["DOCUMENTO"],
-            "item": dados["LINHAITEM"],
-            "data": pd.to_datetime(dados["EMISSAO"], errors="coerce").dt.strftime("%Y-%m-%d"),
-            "tipo": dados["TIPODOCTO"],
-            "fornecedor": dados["FORNECEDOR"],
-            "produto": dados["PRODUTO"],
-            "qtde": _num(dados["QUANTIDADE"]),
-            "preco": _num(dados["PRECOUNITARIO"]),
-            "valor": _num(dados["LIQUIDOPEDIDO"]),
-            "cancelado": dados["CANCELADO"],
+            "_case_id": cases["_CASE_KEY"].astype(str),   # oculto: filtro de variante
+            "documento": cases["PDDOCO"],
+            "item": cases["PDLNID"],
+            "data": pd.to_datetime(cases["FDISSU_CONV"], errors="coerce").dt.strftime("%Y-%m-%d"),
+            "tipo": cases["IC_TYPE"],
+            "fornecedor": cases["PDAN8"],
+            "produto": cases["PDDSC1"],
+            # PDUORG traz 3 casas decimais implícitas (qtde real = PDUORG / 1000)
+            "qtde": _num(cases["PDUORG"]) / 1000.0,
+            "preco": _num(cases["PDPRRC"]),
+            "valor": _num(cases["PDAEXP"]),
+            "cancelado": _cancel.gt(0).map({True: "Sim", False: "Não"}),
         })
 
     eventtime = pd.to_datetime(acts["EVENTTIME"], errors="coerce")
