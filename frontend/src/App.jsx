@@ -233,6 +233,10 @@ export default function App() {
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2400); };
   const openDrill = (key) => setDrill(data?.drill?.[key] || null);
 
+  // usuário só-chat (screens = ["assistant"]): vê apenas o chat e NÃO carrega o
+  // payload pesado do módulo (o chat só precisa da chave do módulo)
+  const chatOnly = auth?.screens?.length === 1 && auth.screens[0] === "assistant";
+
   const load = useCallback(async (key, f) => {
     setLoading(true); setError(null);
     try {
@@ -264,8 +268,9 @@ export default function App() {
 
   useEffect(() => {
     if (!auth?.token) return;   // só carrega depois de autenticado (evita 401 no mount)
+    if (chatOnly) { setLoading(false); return; }   // só-chat: sem carga do payload
     yearDefaulted.current = null; setFilters(EMPTY_FILTERS); load(moduleKey, EMPTY_FILTERS);
-  }, [moduleKey, load, auth]);
+  }, [moduleKey, load, auth, chatOnly]);
   useEffect(() => { setDrill(null); }, [moduleKey, screen]);
 
   // telas liberadas p/ o usuário (allow-list opcional; vazio = todas). Se a tela
@@ -312,7 +317,7 @@ export default function App() {
   const conformPct = data ? Math.round(data.variants.filter(v => v.conformant).reduce((s, v) => s + v.pct, 0)) : 0;
   const leadKpi = data?.kpis?.find(k => k.id === "lead");
 
-  const headInfo = !data ? { title: "Carregando…", sub: null } : {
+  const headInfo = !data ? { title: chatOnly ? "Assistente IA" : "Carregando…", sub: null } : {
     overview:  { title: "Visão Geral", sub: <>Dashboard · <b>{data.totalCases.toLocaleString("pt-BR")}</b> casos · <b>4</b> indicadores</> },
     explorer:  { title: "Explorador de Processo", sub: <>Modelo descoberto · <b>{data.totalCases.toLocaleString("pt-BR")}</b> casos · <b>{data.avgVariants}</b> variantes</> },
     variants:  { title: "Variantes do Processo",  sub: <><b>{data.avgVariants}</b> caminhos distintos do início ao fim</> },
@@ -357,9 +362,11 @@ export default function App() {
         </div>
         <span className="spacer" />
         <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={onUpload} />
-        <button className="btn" onClick={onRefresh} title="Recarregar os dados do banco">
-          <Icon name="loop" size={15} />Atualizar dados
-        </button>
+        {!chatOnly && (
+          <button className="btn" onClick={onRefresh} title="Recarregar os dados do banco">
+            <Icon name="loop" size={15} />Atualizar dados
+          </button>
+        )}
         <button className="icon-btn" onClick={() => setDark(d => !d)} title="Alternar tema">
           <Icon name={dark ? "sun" : "moon"} size={17} />
         </button>
@@ -387,22 +394,24 @@ export default function App() {
               {s.id === "dashboard" && alertCount > 0 && <span className="nbadge">{alertCount}</span>}
             </div>
           ))}
-          <div className="rail-eyebrow">Processo</div>
-          <div className="metric"><span className="k">Lead time médio</span><span className="v good">{leadKpi ? `${leadKpi.value} ${leadKpi.unit || ""}` : "—"}</span></div>
-          <div className="metric"><span className="k">Conformidade do processo</span><span className="v">{conformPct}%</span></div>
-          <div className="rail-spacer" />
-          <div className="file-card">
-            <span className="fi"><Icon name="database" size={16} /></span>
-            <div>
-              <div className="fn">{data?.short || "Veddara-O2C"} · banco</div>
-              <div className="fs">{data ? `${data.totalCases.toLocaleString("pt-BR")} casos` : "—"}</div>
+          {!chatOnly && <>
+            <div className="rail-eyebrow">Processo</div>
+            <div className="metric"><span className="k">Lead time médio</span><span className="v good">{leadKpi ? `${leadKpi.value} ${leadKpi.unit || ""}` : "—"}</span></div>
+            <div className="metric"><span className="k">Conformidade do processo</span><span className="v">{conformPct}%</span></div>
+            <div className="rail-spacer" />
+            <div className="file-card">
+              <span className="fi"><Icon name="database" size={16} /></span>
+              <div>
+                <div className="fn">{data?.short || "Veddara-O2C"} · banco</div>
+                <div className="fs">{data ? `${data.totalCases.toLocaleString("pt-BR")} casos` : "—"}</div>
+              </div>
             </div>
-          </div>
+          </>}
         </nav>
 
         {/* APP */}
         <div className="app">
-          {data ? (
+          {data && !chatOnly ? (
             <Ribbon data={data} headInfo={headInfo} filters={filters} setFilter={setFilter} />
           ) : (
             <header className="ribbon">
@@ -410,7 +419,10 @@ export default function App() {
             </header>
           )}
 
-          {polling && (
+          {chatOnly && (
+            <div className="screen-fill"><AssistantScreen key={moduleKey} data={{ key: moduleKey }} filters={filters} /></div>
+          )}
+          {!chatOnly && polling && (
             <div className="real-loading">
               <div className="rl-spin"><Icon name="activity" size={30} className="spin" /></div>
               <div className="rl-title">Carregando dados do banco…</div>
@@ -419,12 +431,12 @@ export default function App() {
               <div className="rl-pct mono">{Math.round(progress)}%</div>
             </div>
           )}
-          {loading && !polling && (
+          {!chatOnly && loading && !polling && (
             <div style={{ display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 14 }}>
               <span><Icon name="activity" size={18} className="spin" style={{ marginRight: 8, verticalAlign: -3 }} />Carregando…</span>
             </div>
           )}
-          {error && !loading && !polling && (
+          {!chatOnly && error && !loading && !polling && (
             <div style={{ padding: 40, color: "var(--crit)", fontSize: 13 }}>
               <Icon name="alert" size={16} style={{ marginRight: 8, verticalAlign: -3 }} />Erro ao carregar: {error}
             </div>
