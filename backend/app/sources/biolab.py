@@ -143,4 +143,12 @@ def load_biolab_eventlog(conn: AgentConnector | None = None, progress=None) -> p
         log["cliente"], log["produto"], log["valor"] = "—", "—", 0.0
 
     log = log.sort_values(["case_id", "timestamp"]).reset_index(drop=True)
+
+    # "Emissão" da Detalhes = início do caso (1º evento no log), que todo caso
+    # tem — o export só traz data confiável na nota (FDISSU), então requisições/
+    # pedidos não faturados ficariam sem data. Cai para FDISSU se faltar o evento.
+    if _CASES_DETAIL is not None and not _CASES_DETAIL.empty and not log.empty:
+        inicio = log.groupby("case_id")["timestamp"].min().dt.strftime("%Y-%m-%d")
+        _CASES_DETAIL["data"] = _CASES_DETAIL["_case_id"].map(inicio).fillna(_CASES_DETAIL["data"])
+
     return log
