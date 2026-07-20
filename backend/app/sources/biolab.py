@@ -85,18 +85,22 @@ def load_biolab_eventlog(conn: AgentConnector | None = None, progress=None) -> p
     # uma linha por _CASE_KEY, tudo da mesma CASE (aposenta a antiga SQL_PM_DADOS)
     cases = conn.paginate_offset(
         "_CASE_KEY, PDAN8, PDDSC1, PDAEXP, IC_TYPE, PDDOCO, PDDCTO, PDLNID, "
-        "PDUORG, PDPRRC, PDAEXP_CANCELADO, FDISSU_CONV",
+        "PDUORG, PDPRRC, PDAEXP_CANCELADO, PDTRDJ_CONV, FDISSU_CONV",
         CASE_TABLE, order="_CASE_KEY")
     progress(90)
 
     global _CASES_DETAIL
     if not cases.empty:
         _cancel = _num(cases["PDAEXP_CANCELADO"]).fillna(0.0)
+        # Emissão = data do pedido (PDTRDJ_CONV, já convertida do Juliano no
+        # export); cai para a data da nota (FDISSU_CONV) nos casos NF sem pedido
+        _emissao = pd.to_datetime(cases["PDTRDJ_CONV"], errors="coerce").fillna(
+            pd.to_datetime(cases["FDISSU_CONV"], errors="coerce"))
         _CASES_DETAIL = pd.DataFrame({
             "_case_id": cases["_CASE_KEY"].astype(str),   # oculto: filtro de variante
             "documento": cases["PDDOCO"],
             "item": cases["PDLNID"],
-            "data": pd.to_datetime(cases["FDISSU_CONV"], errors="coerce").dt.strftime("%Y-%m-%d"),
+            "data": _emissao.dt.strftime("%Y-%m-%d"),
             "tipo": cases["IC_TYPE"],
             "fornecedor": cases["PDAN8"],
             "produto": cases["PDDSC1"],
@@ -143,12 +147,4 @@ def load_biolab_eventlog(conn: AgentConnector | None = None, progress=None) -> p
         log["cliente"], log["produto"], log["valor"] = "—", "—", 0.0
 
     log = log.sort_values(["case_id", "timestamp"]).reset_index(drop=True)
-
-    # "Emissão" da Detalhes = início do caso (1º evento no log), que todo caso
-    # tem — o export só traz data confiável na nota (FDISSU), então requisições/
-    # pedidos não faturados ficariam sem data. Cai para FDISSU se faltar o evento.
-    if _CASES_DETAIL is not None and not _CASES_DETAIL.empty and not log.empty:
-        inicio = log.groupby("case_id")["timestamp"].min().dt.strftime("%Y-%m-%d")
-        _CASES_DETAIL["data"] = _CASES_DETAIL["_case_id"].map(inicio).fillna(_CASES_DETAIL["data"])
-
     return log
