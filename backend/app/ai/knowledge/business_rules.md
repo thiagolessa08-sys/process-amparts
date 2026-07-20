@@ -47,6 +47,24 @@ Formato: `orcamento|orc_item|pedido|ped_item|fatura|fat_item` — **números vis
 - Atividades de retrabalho por processo: ver `catalog.md`.
   - Cordeiro **não tem** atividade de alteração (só cancelamentos + DEVOLUÇÃO FATURA).
 
+## Vazamento de contrato (Biolab)
+Item comprado **fora de um contrato vigente**. Flag legível: `VAZAMENTOCONTR = 'Sim'`
+(em `SQL_PM_DADOS`) — ~677 itens em 2026. Equivalente na CASE:
+`IC_CONTRACT_LEAKAGE <> '0'` (~681 no total).
+- **`IC_CONTRACT_LEAKAGE` NÃO é 0/1**: quando há vazamento, guarda a **chave (`_CASE_KEY`)
+  do documento de contrato** (tipo `OB`) que deveria ter sido usado.
+- **Preço praticado** = `PDPRRC` do próprio item. **Preço contratado** = `PDPRRC` do
+  contrato referenciado → self-join:
+  `... a JOIN ... b ON a.IC_CONTRACT_LEAKAGE = b._CASE_KEY`.
+- ⚠️ **Limite do dado**: o preço do contrato (`b.PDPRRC`) vem como **placeholder `1`
+  na maioria** — só ~62 dos vazados têm preço real. Para o "% acima do contratado",
+  filtre `b.PDPRRC > 1 AND a.PDUOM = b.PDUOM` (≈59 itens); nesse subconjunto o praticado
+  foi em média **~+57%** maior. Para os demais, o preço contratado **não está armazenado**
+  — não dá para calcular o %; responda o que dá (nº de itens, valor `SUM(PDAEXP)`,
+  fornecedores/produtos que concentram) e explique o limite.
+- `PDDOCO_QUEBRA_PRECO` / `PEDIDOQUEBRAALCADA` = quebra de alçada (aprovação), assunto
+  distinto de vazamento de contrato.
+
 ## Fluxo (happy path)
 - **Veddara**: CRIACAO DO ORCAMENTO → CRIACAO DO PEDIDO → CRIACAO DA FATURA.
 - **Cordeiro**: CRIOU ORCAMENTO → APROVOU ORCAMENTO → CRIOU PEDIDO → CRIOU FATURA → PAGOU FATURA.

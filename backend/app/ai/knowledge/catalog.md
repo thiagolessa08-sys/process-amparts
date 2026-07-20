@@ -133,6 +133,8 @@ Principais:
 | PDUOM / PDCRCD | unidade / moeda (BRL) |
 | PDAEXP_CANCELADO | valor cancelado (> 0 ⇒ cancelado) |
 | FDAEXP_DEVOLVIDO | valor devolvido |
+| IC_CONTRACT_LEAKAGE | **vazamento de contrato**: `'0'` = sem vazamento; senão = `_CASE_KEY` do **contrato (OB)** que deveria ter sido usado (ver regras) |
+| PDDOCO_QUEBRA_PRECO | flag de quebra de preço/alçada |
 
 **Datas = Julianas no JDE — SEMPRE use os campos convertidos com sufixo `_CONV`:**
 `PDTRDJ_CONV` = **data do pedido / emissão** (~98% preenchido); `FDISSU_CONV` = data
