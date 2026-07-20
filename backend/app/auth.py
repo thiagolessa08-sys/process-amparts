@@ -19,7 +19,7 @@ DEFAULT_USERS = [
      "pass_sha256": "ed9d8e8c9652426151cc9d1a6b3f59e06f71b0d1bab44eda57621ee5c369b873"},
     {"email": "biolab@fluxo.com", "name": "Biolab", "modules": ["biolab"],
      "pass_sha256": "da13ef6f75dab6c675b1fbcd13b61eb5954b44ef8a0ff82398d8665184f1ec85"},
-    {"email": "biolab.chat@fluxo.com", "name": "Biolab Chat", "modules": ["biolab"],
+    {"email": "suporte.celonis@sqltech.com.br", "name": "Biolab Chat", "modules": ["biolab"],
      "screens": ["assistant"],
      "pass_sha256": "c3e7f5b672a8fd0dca1c33dc086f12c781e73f8382eaf237d8dc545ce858cbae"},
     {"email": "cordeiro@fluxo.com", "name": "Cordeiro", "modules": ["cordeiro"],
