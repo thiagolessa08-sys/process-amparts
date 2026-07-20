@@ -30,7 +30,9 @@ Formato: `orcamento|orc_item|pedido|ped_item|fatura|fat_item` — **números vis
   - Faturamento = **`SUM(FAT_TOTAL)`**. "Valor" do caso = `COALESCE(FAT_TOTAL, PED_TOTAL, 0)`.
   - Validado com a base do Rafael: jan/2026 `SUM(FAT_TOTAL)` ≈ R$ 211,8M (total geral de NFs).
 - **Veddara**: valor do caso = `VL_ORC_TOTAL_ITEM`.
-- **Biolab**: valor = `LIQUIDOPEDIDO` (SQL_PM_DADOS) ou `PDAEXP` (SQL_PM_CASES).
+- **Biolab**: valor = `LIQUIDOPEDIDO` (SQL_PM_DADOS, detalhe) ou `PDAEXP`
+  (TB_BIOLAB_CELONIS_EXPORT_CASE). Quantidade tem **3 casas implícitas** em ambas
+  (`QUANTIDADE`/`PDUORG` ÷ 1000); o valor já vem correto.
 
 ## Datas / período
 - Filtro "por data do pedido": Cordeiro/Veddara usam a data do evento **CRIOU/CRIACAO DO

@@ -10,7 +10,7 @@ Cada processo fica em seu próprio schema:
 |---|---|---|---|---|---|
 | Veddara-O2C | `veddara` | `SQL_PM_ATIVIDADES` | `SQL_PM_CASES` | `ACTIVITY_EN` | `_CASE_KEY_O2C` |
 | Cordeiro-O2C | `cordeiro` | `SQL_PM_ATIVIDADES` | `SQL_PM_CASES` | `ACTIVITY_EN` | `_CASE_KEY_O2C` |
-| Biolab-P2P | `biolab` | `SQL_PM_ATIVIDADES` | `SQL_PM_CASES` (+ `SQL_PM_DADOS`) | `ACTIVITY_NAME` | `_CASE_KEY` |
+| Biolab-P2P | `biolab` | `TB_BIOLAB_CELONIS_EXPORT_ACTIVITIES` | `TB_BIOLAB_CELONIS_EXPORT_CASE` | `ACTIVITY_NAME` | `_CASE_KEY` |
 
 - **ATIVIDADES** = event log: 1 linha por EVENTO. Um CASO = a chave do caso.
 - **CASES** = 1 linha por caso/item, com datas e valores.
@@ -97,37 +97,77 @@ Retrabalho: `CANCELOU ORCAMENTO`, `CANCELOU PEDIDO`, `CANCELOU FATURA`,
 
 ## Biolab-P2P — schema `biolab`  (JD Edwards)
 
-### biolab.SQL_PM_ATIVIDADES  (16 colunas)
+> Event log e casos vêm de **`TB_BIOLAB_CELONIS_EXPORT_ACTIVITIES`** (eventos) +
+> **`TB_BIOLAB_CELONIS_EXPORT_CASE`** (casos). `_CASE_KEY` casa 100% entre as duas.
+> **`SQL_PM_DADOS`** segue **válida e atualizada** como tabela de **detalhe P2P**
+> (1 linha por documento+item, campos já tratados/legíveis) — use-a para consultas
+> de detalhe (produto, fornecedor, datas, valor, flags de alteração/retrabalho).
+
+### biolab.TB_BIOLAB_CELONIS_EXPORT_ACTIVITIES  (16 colunas — event log)
 | coluna | tipo | descrição |
 |---|---|---|
-| _CASE_KEY | varchar(22) | chave do caso |
+| _CASE_KEY | varchar | chave do caso |
 | ACTIVITY_NAME | varchar(21) | nome da atividade (**truncado em ~21 chars**) |
-| EVENTTIME | varchar(19) | data/hora (string 'YYYY-MM-DD HH:MM:SS') |
-| _SORTING | integer | ordem lógica do evento |
+| EVENTTIME | varchar | data/hora ('YYYY-MM-DD HH:MM:SS.0') |
+| _SORTING | integer | ordem lógica do evento (use isto, não a data) |
 | PDKCOO, PDDOCO, PDDCTO, PDSFXO, PDLNID | varchar | chaves do documento JDE |
-| _DESCRIPTION | varchar(32) | descrição |
-| _USER_NAME | varchar(12) | usuário |
+| _DESCRIPTION | varchar | descrição do item |
+| _USER_NAME | varchar | usuário |
 | CHANGED_FROM / CHANGED_TO | varchar | valor antigo/novo (em alterações) |
-| AUDIT_PROGRAM / AUDIT_COMPUTER | varchar(12) | auditoria |
-| DT_INCLUSAO | timestamp | data de inclusão no PM |
+| AUDIT_PROGRAM / AUDIT_COMPUTER / AUDIT_LINE_UKID | varchar | auditoria |
 
-### biolab.SQL_PM_CASES  (78 colunas — campos crus do JDE, prefixo PD/FD)
-Principais: `_CASE_KEY`, `PDAN8` (fornecedor), `PDDSC1` (descrição/produto),
-`PDAEXP` (valor), `PDUOM` (unidade), datas `*_CONV` (PDDRQJ_CONV solicitação,
-PDPDDJ_CONV promessa, etc.), `PDAEXP_CANCELADO`, `PDAEXP_DEVOLVIDO`.
-(Tabela ampla; consulte só as colunas necessárias.)
+### biolab.TB_BIOLAB_CELONIS_EXPORT_CASE  (77 colunas — casos)
+Tabela ampla (campos crus JDE, prefixo PD/FD). **Consulte só as colunas necessárias.**
+Principais:
+| coluna | descrição |
+|---|---|
+| _CASE_KEY | chave do caso |
+| IC_TYPE | tipo do caso (NF, PD, …) |
+| PDDOCO / PDLNID | nº do documento / item |
+| PDDCTO | tipo de documento (OF, OP, OS, OL, …) |
+| PDAN8 | **fornecedor** (código) |
+| PDDSC1 | **produto / descrição** |
+| PDUORG | **quantidade — 3 casas decimais IMPLÍCITAS** (qtde real = `PDUORG / 1000`) |
+| PDPRRC | preço unitário |
+| PDAEXP | **valor estendido (autoritativo)** = qtde × preço |
+| PDUOM / PDCRCD | unidade / moeda (BRL) |
+| PDAEXP_CANCELADO | valor cancelado (> 0 ⇒ cancelado) |
+| FDAEXP_DEVOLVIDO | valor devolvido |
 
-### biolab.SQL_PM_DADOS  (25 colunas — detalhe P2P)
-| coluna | tipo | descrição |
-|---|---|---|
-| DOCUMENTO / LINHAITEM | integer | nº do documento / item |
-| TIPO_COMPRA, TIPODOCTO | varchar | tipo de compra / documento |
-| DTSOLICITACAO, DTENTREGA, DTREMESSA, EMISSAO | date | datas |
-| ALTERACOES, RETRABALHO, VAZAMENTOCONTR | varchar | flags |
-| FORNECEDOR | varchar(42) | fornecedor |
-| PRODUTO | varchar(58) | produto |
-| QUANTIDADE, PRECOUNITARIO, LIQUIDOPEDIDO | decimal | qtde, preço unit., **valor líquido** |
-| CANCELADO | decimal | valor cancelado |
+**Datas = Julianas no JDE — SEMPRE use os campos convertidos com sufixo `_CONV`:**
+`PDTRDJ_CONV` = **data do pedido / emissão** (~98% preenchido); `FDISSU_CONV` = data
+da nota (fallback para os NF sem pedido); `PDDRQJ_CONV` = solicitação/requisição.
+Os campos sem `_CONV` (PDTRDJ, PDDRQJ, …) vêm no formato Juliano cru — **não use**.
+
+### biolab.SQL_PM_DADOS  (28 colunas — detalhe P2P, campos legíveis)
+Tabela de detalhe já tratada (datas em texto 'YYYY-MM-DD', tipos por extenso).
+Grão = documento + item. Ideal para consultas de detalhe no chat.
+| coluna | descrição |
+|---|---|
+| DOCUMENTO / LINHAITEM | nº do documento / item |
+| DOCTOORIGINAL | documento de origem *(novo)* |
+| TIPO_COMPRA | tipo de compra (ex.: `Suprimentos`) |
+| TIPODOCTO | tipo de documento por extenso (ex.: `OP-Pedido de Compra`) |
+| EMPRESA | código da empresa (ex.: `01100`) *(novo)* |
+| UNIDADENEG | unidade de negócio *(novo)* |
+| CONTRATO | nº do contrato (pode ser nulo) *(novo)* |
+| EMISSAO | data de emissão ('YYYY-MM-DD') |
+| DTSOLICITACAO / DTENTREGA / DTREMESSA | datas de solicitação / entrega / remessa |
+| ENTREGA | status da entrega (ex.: `Previsão de Entrega Futura`) *(novo)* |
+| FORNECEDOR | nome do fornecedor |
+| PRODUTO | código–descrição do produto |
+| REFERENCIA | referência *(novo)* |
+| LOCALIZACAO | localização *(novo)* |
+| QUANTIDADE | quantidade — **3 casas decimais implícitas** (qtde real = `QUANTIDADE / 1000`) |
+| PRECOUNITARIO | preço unitário |
+| LIQUIDOPEDIDO | **valor líquido do pedido** (= qtde × preço; autoritativo) |
+| CANCELADO | valor cancelado (`> 0` ⇒ cancelado) |
+| ALTERACOES | flag `Com Alteração` / `Sem Alteração` |
+| RETRABALHO | flag `Com Retrabalho` / `Sem Retrabalho` |
+| VAZAMENTOCONTR | vazamento de contrato (`Sim`/`Não`) |
+| ADERENCIACONTRATO | aderência a contrato *(novo)* |
+| QUEBRAALCADA / PEDIDOQUEBRAALCADA | quebra de alçada *(novo)* |
+| DT_INCLUSAO | timestamp de inclusão no PM |
 
 ### Atividades (ACTIVITY_NAME) — nomes truncados em ~21 chars
 Fluxo: `Entrar Requisição` → `Entrar Pedido de Comp` → `Recebimento` →
