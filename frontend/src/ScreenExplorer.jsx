@@ -4,6 +4,9 @@ import { Sev, DataTable } from "./components.jsx";
 
 const fmt = (n) => Math.round(n).toLocaleString("pt-BR");
 
+// piso do zoom — baixo o bastante para "Ajustar" caber fluxos muito longos inteiros
+const MIN_ZOOM = 0.1;
+
 // frequência -> roxo (baixo = lavanda, alto = violeta profundo)
 function freqColor(t) {
   t = Math.max(0, Math.min(1, t));
@@ -471,6 +474,7 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef(null);
+  const viewportRef = useRef(null);
   const [showFilters, setShowFilters] = useState(false);
   const [popover, setPopover] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -497,7 +501,24 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
     setPan({ x: dragRef.current.ox + (e.clientX - dragRef.current.sx), y: dragRef.current.oy + (e.clientY - dragRef.current.sy) });
   }
   function onPointerUp() { dragRef.current = null; setDragging(false); }
-  function resetView() { setPan({ x: 0, y: 0 }); setZoom(0.92); setPopover(null); }
+  // "Ajustar": mede o fluxo pelo tamanho de LAYOUT (offset*, imune ao scale atual e
+  // à transição em curso) e escolhe o zoom que o faz caber inteiro no viewport.
+  // O pan não pode ser 0: quando o fluxo é mais alto que o viewport, o grid deixa de
+  // centralizá-lo e o scale gira em torno do centro do bloco não escalado. Levar esse
+  // centro ao centro do viewport (o scale não desloca o próprio centro) resolve os
+  // dois casos — fluxo que cabe e fluxo que não cabe.
+  function fitView() {
+    setPopover(null);
+    const vp = viewportRef.current;
+    const g = vp && vp.querySelector(".graph");
+    if (!vp || !g || !g.offsetHeight) { setPan({ x: 0, y: 0 }); setZoom(0.92); return; }
+    const pad = 40;
+    const k = Math.min((vp.clientWidth - pad) / g.offsetWidth,
+                       (vp.clientHeight - pad) / g.offsetHeight, 1.8);
+    setPan({ x: vp.clientWidth / 2 - (g.offsetLeft + g.offsetWidth / 2),
+             y: vp.clientHeight / 2 - (g.offsetTop + g.offsetHeight / 2) });
+    setZoom(+Math.max(MIN_ZOOM, k).toFixed(2));
+  }
 
   const [localForn, setLocalForn] = useState(filters?.fornecedores ?? []);
   const [startDate, setStartDate] = useState(filters?.startDate ?? "");
@@ -685,7 +706,7 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
           </div>
         </div>
 
-        <div className="viewport"
+        <div className="viewport" ref={viewportRef}
           style={{ cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}
           onPointerDown={onPointerDown} onPointerMove={onPointerMove}
           onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
@@ -704,8 +725,8 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
         <div className="zoom">
           <div className="zoom-stack">
             <button onClick={() => { setZoom((z) => Math.min(1.8, +(z + 0.12).toFixed(2))); setPopover(null); }}><Icon name="plus" size={16} /></button>
-            <button onClick={() => { setZoom((z) => Math.max(0.4, +(z - 0.12).toFixed(2))); setPopover(null); }}><Icon name="minus" size={16} /></button>
-            <button onClick={resetView}><Icon name="fit" size={16} /></button>
+            <button onClick={() => { setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.12).toFixed(2))); setPopover(null); }}><Icon name="minus" size={16} /></button>
+            <button onClick={fitView} title="Ajustar à tela"><Icon name="fit" size={16} /></button>
           </div>
           <div className="zoom-pct mono">{Math.round(zoom * 100)}%</div>
         </div>
