@@ -1,11 +1,39 @@
-import { useState, useMemo, useEffect, useRef, useLayoutEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 import { Icon } from "./icons.jsx";
 import { Sev, DataTable } from "./components.jsx";
 
 const fmt = (n) => Math.round(n).toLocaleString("pt-BR");
 
 // piso do zoom — baixo o bastante para "Ajustar" caber fluxos muito longos inteiros
-const MIN_ZOOM = 0.1;
+export const MIN_ZOOM = 0.1;
+
+// Enquadra o fluxo inteiro no viewport — usado pelo botão "Ajustar" e aplicado
+// automaticamente ao abrir o fluxo. Compartilhado por Explorador e Retrabalho, que
+// têm a mesma estrutura (.viewport > .graph).
+//
+// Mede pelo tamanho de LAYOUT (offset*), imune ao scale atual e à transição CSS em
+// curso. O pan não pode ser 0: quando o fluxo é mais alto que o viewport, o grid
+// deixa de centralizá-lo e o scale gira em torno do centro do bloco não escalado,
+// empurrando o conteúdo para baixo. Levar esse centro ao centro do viewport (o scale
+// não desloca o próprio centro) cobre os dois casos — fluxo que cabe e que não cabe.
+export function useFitView(setZoom, setPan, resetDeps = []) {
+  const viewportRef = useRef(null);
+  const fitView = useCallback(() => {
+    const vp = viewportRef.current;
+    const g = vp && vp.querySelector(".graph");
+    if (!vp || !g || !g.offsetHeight) return;
+    const pad = 40;
+    const k = Math.min((vp.clientWidth - pad) / g.offsetWidth,
+                       (vp.clientHeight - pad) / g.offsetHeight, 1.8);
+    setPan({ x: vp.clientWidth / 2 - (g.offsetLeft + g.offsetWidth / 2),
+             y: vp.clientHeight / 2 - (g.offsetTop + g.offsetHeight / 2) });
+    setZoom(+Math.max(MIN_ZOOM, k).toFixed(2));
+  }, [setZoom, setPan]);
+
+  // enquadra ao montar e sempre que o fluxo exibido troca (mudança de módulo/dataset)
+  useLayoutEffect(() => { fitView(); }, [fitView, ...resetDeps]);
+  return { viewportRef, fitView };
+}
 
 // frequência -> roxo (baixo = lavanda, alto = violeta profundo)
 function freqColor(t) {
@@ -474,7 +502,8 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef(null);
-  const viewportRef = useRef(null);
+  // "Ajustar" e enquadramento automático ao abrir o fluxo
+  const { viewportRef, fitView } = useFitView(setZoom, setPan, [data]);
   const [showFilters, setShowFilters] = useState(false);
   const [popover, setPopover] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -501,24 +530,6 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
     setPan({ x: dragRef.current.ox + (e.clientX - dragRef.current.sx), y: dragRef.current.oy + (e.clientY - dragRef.current.sy) });
   }
   function onPointerUp() { dragRef.current = null; setDragging(false); }
-  // "Ajustar": mede o fluxo pelo tamanho de LAYOUT (offset*, imune ao scale atual e
-  // à transição em curso) e escolhe o zoom que o faz caber inteiro no viewport.
-  // O pan não pode ser 0: quando o fluxo é mais alto que o viewport, o grid deixa de
-  // centralizá-lo e o scale gira em torno do centro do bloco não escalado. Levar esse
-  // centro ao centro do viewport (o scale não desloca o próprio centro) resolve os
-  // dois casos — fluxo que cabe e fluxo que não cabe.
-  function fitView() {
-    setPopover(null);
-    const vp = viewportRef.current;
-    const g = vp && vp.querySelector(".graph");
-    if (!vp || !g || !g.offsetHeight) { setPan({ x: 0, y: 0 }); setZoom(0.92); return; }
-    const pad = 40;
-    const k = Math.min((vp.clientWidth - pad) / g.offsetWidth,
-                       (vp.clientHeight - pad) / g.offsetHeight, 1.8);
-    setPan({ x: vp.clientWidth / 2 - (g.offsetLeft + g.offsetWidth / 2),
-             y: vp.clientHeight / 2 - (g.offsetTop + g.offsetHeight / 2) });
-    setZoom(+Math.max(MIN_ZOOM, k).toFixed(2));
-  }
 
   const [localForn, setLocalForn] = useState(filters?.fornecedores ?? []);
   const [startDate, setStartDate] = useState(filters?.startDate ?? "");
@@ -726,7 +737,7 @@ export function ExplorerScreen({ data, filters, onFiltersChange }) {
           <div className="zoom-stack">
             <button onClick={() => { setZoom((z) => Math.min(1.8, +(z + 0.12).toFixed(2))); setPopover(null); }}><Icon name="plus" size={16} /></button>
             <button onClick={() => { setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.12).toFixed(2))); setPopover(null); }}><Icon name="minus" size={16} /></button>
-            <button onClick={fitView} title="Ajustar à tela"><Icon name="fit" size={16} /></button>
+            <button onClick={() => { fitView(); setPopover(null); }} title="Ajustar à tela"><Icon name="fit" size={16} /></button>
           </div>
           <div className="zoom-pct mono">{Math.round(zoom * 100)}%</div>
         </div>

@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Icon } from "./icons.jsx";
-import { Graph, buildSubgraph, defaultSelection } from "./ScreenExplorer.jsx";
+import { Graph, buildSubgraph, defaultSelection, useFitView, MIN_ZOOM } from "./ScreenExplorer.jsx";
 
 /* formatadores compactos */
 function fmtCompact(n) {
@@ -144,6 +144,8 @@ export function ReworkScreen({ data }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef(null);
+  // "Ajustar" e enquadramento automático ao abrir o fluxo
+  const { viewportRef, fitView } = useFitView(setZoom, setPan, [data]);
   const onPointerDown = (e) => {
     if (e.target.closest("button, .zoom, .legend, .node, .node-pop")) return;
     setDragging(true);
@@ -154,12 +156,11 @@ export function ReworkScreen({ data }) {
     setPan({ x: dragRef.current.ox + (e.clientX - dragRef.current.sx), y: dragRef.current.oy + (e.clientY - dragRef.current.sy) });
   };
   const onPointerUp = () => { dragRef.current = null; setDragging(false); };
-  const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(RWK_ZOOM0); };
 
   return (
     <div className="rework">
       <div className="rwk-flow">
-        <div className="viewport" style={{ cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}
+        <div className="viewport" ref={viewportRef} style={{ cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}
           onPointerDown={onPointerDown} onPointerMove={onPointerMove}
           onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
           <Graph graphData={graphData} mode="contagem" zoom={zoom} pan={pan} dragging={dragging}
@@ -174,8 +175,8 @@ export function ReworkScreen({ data }) {
         <div className="zoom">
           <div className="zoom-stack">
             <button onClick={() => setZoom((z) => Math.min(1.8, +(z + 0.12).toFixed(2)))}><Icon name="plus" size={16} /></button>
-            <button onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.12).toFixed(2)))}><Icon name="minus" size={16} /></button>
-            <button onClick={resetView}><Icon name="fit" size={16} /></button>
+            <button onClick={() => setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.12).toFixed(2)))}><Icon name="minus" size={16} /></button>
+            <button onClick={fitView} title="Ajustar à tela"><Icon name="fit" size={16} /></button>
           </div>
           <div className="zoom-pct mono">{Math.round(zoom * 100)}%</div>
         </div>
