@@ -351,7 +351,7 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <span className="logo"><Icon name="activity" size={17} strokeWidth={2.4} /></span>
-          <span className="name">Fluxo<span className="dim">·mining</span></span>
+          <span className="name">Process<span className="dim"> Intelligence</span></span>
         </div>
         <div className="tabs">
           {MODULES.filter((m) => (auth.modules || []).includes(m.key)).map((m) => (

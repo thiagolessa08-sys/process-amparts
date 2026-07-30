@@ -67,7 +67,7 @@ export function LoginScreen({ onLogin, dark, onToggleTheme }) {
             <Icon name="activity" size={22} strokeWidth={2.4} />
           </span>
           <span className="auth-brand-name">
-            Fluxo<span className="dim">·mining</span>
+            Process<span className="dim"> Intelligence</span>
           </span>
         </div>
 
@@ -90,7 +90,7 @@ export function LoginScreen({ onLogin, dark, onToggleTheme }) {
           </ul>
         </div>
 
-        <div className="auth-aside-foot">© {new Date().getFullYear()} Fluxo·mining</div>
+        <div className="auth-aside-foot">© {new Date().getFullYear()} Process Intelligence</div>
       </aside>
 
       {/* Formulário */}
@@ -98,7 +98,7 @@ export function LoginScreen({ onLogin, dark, onToggleTheme }) {
         <form className="auth-card" onSubmit={submit}>
           <div className="auth-card-head">
             <h1>Entrar</h1>
-            <p>Acesse a plataforma de Process Mining.</p>
+            <p>Acesse a plataforma de Process Intelligence.</p>
           </div>
 
           <label className="auth-field">
