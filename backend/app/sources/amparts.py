@@ -1,0 +1,246 @@
+"""Event log AM Parts (O2C de acessórios automotivos, com Ordem de Serviço).
+
+Origem: export SQL_PM_ATIVIDADES (eventos) + SQL_PM_CASES (atributos por caso),
+no mesmo formato do Veddara/Cordeiro — o event log já vem pronto, uma linha por
+evento com case key, atividade, timestamp e ordenação. O processo tem uma etapa
+a mais que o O2C clássico: a Ordem de Serviço (abertura, recebimento do veículo,
+finalização) entre o pedido e o faturamento da saída.
+
+Diferente dos outros módulos, a AM Parts **não está no banco**: os dados vêm de
+arquivo. Nesta primeira fase carregamos apenas o recorte de **2026** (905k
+eventos / 119k casos), gerado a partir do export completo. `load_from_db()`
+fica pronta para quando as tabelas forem publicadas no schema `amparts`.
+"""
+from pathlib import Path
+
+import pandas as pd
+
+from ..connectors.agent_connector import AgentConnector
+
+SCHEMA = "amparts"
+ACT_TABLE = f"{SCHEMA}.SQL_PM_ATIVIDADES"
+CASE_TABLE = f"{SCHEMA}.SQL_PM_CASES"
+
+# fase 1: só 2026 (o export tem 2023-2026, mas 2023 é quase vazio e o volume
+# total — 2,8M eventos — não cabe no plano atual de memória do servidor)
+ANO = 2026
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+ACT_FILE = DATA_DIR / f"amparts_atividades_{ANO}.csv.gz"
+CASE_FILE = DATA_DIR / f"amparts_cases_{ANO}.csv.gz"
+
+DESDE = f"{ANO}-01-01"
+
+_READ = dict(sep=";", dtype=str, encoding="utf-8-sig", on_bad_lines="skip")
+
+
+def _periodo_where() -> str:
+    """Janela usada na carga por banco: o ano corrente do recorte, com teto em
+    hoje — o export traz eventos carimbados até 2029, que são datas inválidas."""
+    hoje = pd.Timestamp.now().strftime("%Y-%m-%d")
+    return f"EVENTTIME >= '{DESDE}' AND EVENTTIME <= '{hoje} 23:59:59'"
+
+
+# colunas da tela Detalhes (a partir da SQL_PM_CASES)
+DETAIL_COLS = [
+    {"key": "nrOrc", "label": "Nr. ORC", "fmt": "id"},
+    {"key": "itemOrc", "label": "Item ORC", "fmt": "id"},
+    {"key": "data", "label": "Emissão", "fmt": "text"},
+    {"key": "nrPed", "label": "Nr. PED", "fmt": "id"},
+    {"key": "nrOs", "label": "Nr. OS", "fmt": "id"},
+    {"key": "nrSaida", "label": "Nr. Saída", "fmt": "id"},
+    {"key": "cliente", "label": "Cliente", "fmt": "text"},
+    {"key": "concessionaria", "label": "Concessionária", "fmt": "text"},
+    {"key": "produto", "label": "Produto", "fmt": "text"},
+    {"key": "qtde", "label": "Qtde", "fmt": "int"},
+    {"key": "valor", "label": "Valor Pedido", "fmt": "money"},
+    {"key": "faturado", "label": "Valor Faturado", "fmt": "money"},
+    {"key": "cancelado", "label": "Cancelado", "fmt": "text"},
+]
+
+# painel de atributos do evento (clicar na atividade no Case Explorer)
+EVENT_ATTRS = [
+    {"label": "Atividade", "col": "activity"},
+    {"label": "Case Key", "col": "case_id"},
+    {"label": "Eventtime", "col": "eventtime_raw", "fmt": "date"},
+    {"label": "Orçamento", "col": "orcamento"},
+    {"label": "Item Orç.", "col": "orc_item"},
+    {"label": "Pedido", "col": "pedido"},
+    {"label": "Item Ped.", "col": "ped_item"},
+    {"label": "OS", "col": "os"},
+    {"label": "Saída", "col": "saida"},
+    {"label": "Cliente", "col": "cliente"},
+    {"label": "Concessionária", "col": "concessionaria"},
+    {"label": "Produto", "col": "produto_cod"},
+    {"label": "Descrição", "col": "prod_nome"},
+    {"label": "Usuário", "col": "resource"},
+    {"label": "Vendedor", "col": "vendedor"},
+    {"label": "Origem", "col": "source_activity"},
+    {"label": "Sorting", "col": "sort"},
+]
+
+_CASES_DETAIL: pd.DataFrame | None = None
+
+
+def get_cases_detail() -> pd.DataFrame:
+    """DataFrame de detalhe (uma linha por caso) da SQL_PM_CASES, ou vazio."""
+    return _CASES_DETAIL if _CASES_DETAIL is not None else pd.DataFrame()
+
+
+def _num(s):
+    return pd.to_numeric(s, errors="coerce")
+
+
+def _txt(df, col):
+    return df[col].astype(str).where(df[col].notna(), None) if col in df else None
+
+
+def build_eventlog(acts: pd.DataFrame, cases: pd.DataFrame) -> pd.DataFrame:
+    """Projeta ATIVIDADES + CASES no formato padrão do app.
+
+    Separado da carga para poder ser exercitado sobre uma amostra de CSV sem
+    depender do banco (ver testes).
+    """
+    global _CASES_DETAIL
+
+    if not cases.empty:
+        _cancel = _num(cases["FOI_CANCELADO"]).fillna(0)
+        # Emissão = data do orçamento; cai para a data do pedido quando o caso
+        # nasce direto como pedido (sem orçamento anterior).
+        _emissao = pd.to_datetime(cases["DATA_ORCAMENTO"], errors="coerce").fillna(
+            pd.to_datetime(cases["DATA_PEDIDO"], errors="coerce"))
+        _CASES_DETAIL = pd.DataFrame({
+            "_case_id": cases["CASE_KEY"].astype(str),   # oculto: casa com a variante
+            "nrOrc": cases["ORCAMENTO"],
+            "itemOrc": cases["ORC_ITEM"],
+            "data": _emissao.dt.strftime("%Y-%m-%d"),
+            "nrPed": cases["PEDIDO"],
+            "nrOs": cases["OS"],
+            "nrSaida": cases["SAIDA"],
+            "cliente": cases["CLIENTE"],
+            "concessionaria": cases["CONCESSIONARIA"],
+            "produto": cases["PROD_NOME"],
+            "qtde": _num(cases["PED_QTDE"]),
+            "valor": _num(cases["PED_TOTAL"]),
+            "faturado": _num(cases["FAT_TOTAL"]),
+            "cancelado": _cancel.map(lambda v: "Sim" if v else "Não"),
+        })
+
+    eventtime = pd.to_datetime(acts["EVENTTIME"], errors="coerce")
+    sort = _num(acts["SORTING"]).fillna(0)
+    produto = acts["PROD_NOME"].where(
+        acts["PROD_NOME"].notna() & (acts["PROD_NOME"].astype(str) != ""), acts["PRODUTO"])
+
+    log = pd.DataFrame({
+        "case_id": acts["CASE_KEY"].astype(str),
+        "activity": acts["ACTIVITY_EN"].astype(str).str.strip(),
+        "timestamp": eventtime,
+        "sort": sort.astype("int64"),
+        "resource": acts["USUARIO"].fillna("—"),
+        "vendedor": acts["VENDEDOR"].fillna("—"),
+        "cliente": acts["CLIENTE"].fillna("—"),
+        "produto": produto.fillna("—"),
+        # atributos crus do evento (painel de detalhe no Case Explorer)
+        "eventtime_raw": eventtime,
+        "produto_cod": _txt(acts, "PRODUTO"),
+        "prod_nome": _txt(acts, "PROD_NOME"),
+        "orcamento": _txt(acts, "ORCAMENTO"),
+        "orc_item": _txt(acts, "ORC_ITEM"),
+        "pedido": _txt(acts, "PEDIDO"),
+        "ped_item": _txt(acts, "PED_ITEM"),
+        "os": _txt(acts, "OS"),
+        "saida": _txt(acts, "SAIDA"),
+        "concessionaria": _txt(acts, "CONCESSIONARIA"),
+        "source_activity": _txt(acts, "SOURCE_ACTIVITY"),
+    })
+    log = log.dropna(subset=["timestamp"])
+
+    # valores por caso (somados dos itens do caso) para os 4 KPIs do headline
+    if not cases.empty:
+        _k = cases["CASE_KEY"].astype(str)
+        somas = {
+            "qtde_un": _num(cases["PED_QTDE"]).fillna(0.0),
+            "orc_total": _num(cases["ORC_VALOR"]).fillna(0.0),
+            "valor": _num(cases["PED_TOTAL"]).fillna(0.0),
+            "fat_total": _num(cases["FAT_TOTAL"]).fillna(0.0),
+        }
+        for col, serie in somas.items():
+            log[col] = log["case_id"].map(
+                cases.assign(_k=_k, _v=serie).groupby("_k")["_v"].sum()).fillna(0.0)
+    else:
+        for col in ("qtde_un", "orc_total", "valor", "fat_total"):
+            log[col] = 0.0
+
+    return _ordena_por_sorting(log)
+
+
+def _ordena_por_sorting(log: pd.DataFrame) -> pd.DataFrame:
+    """Coloca os eventos do caso na ordem lógica (SORTING), preservando os
+    instantes reais para o cálculo de duração.
+
+    Regra do projeto (business_rules.md): a ordem lógica de um caso é o SORTING,
+    não o EVENTTIME. Na AM Parts isso é decisivo — medido sobre o recorte de
+    2026, `LIBEROU PEDIDO N1 → N2` vem invertido em 89,6% dos casos (as duas
+    liberações são quase simultâneas) e `CRIOU PEDIDO → PAGAMENTO` em 53,9% (a
+    data do pagamento tem semântica diferente da data do pedido). Os demais
+    pares da espinha estão 100% consistentes.
+
+    O motor de mineração ordena por (case_id, timestamp), então a correção é
+    reatribuir os timestamps do caso na ordem lógica: mantém início, fim,
+    duração total e o conjunto de intervalos entre eventos consecutivos —
+    muda apenas a qual atividade cada instante pertence, que é justamente o
+    que a origem registra de forma não confiável.
+    """
+    logico = log.sort_values(["case_id", "sort", "timestamp"], kind="stable")
+    # mesmo agrupamento por caso nas duas ordenações -> alinhamento posicional
+    cronologico = log.sort_values(["case_id", "timestamp"], kind="stable")
+    out = logico.reset_index(drop=True)
+    out["timestamp"] = cronologico["timestamp"].to_numpy()
+    return out
+
+
+def load_amparts_eventlog(conn: AgentConnector | None = None, progress=None) -> pd.DataFrame:
+    """Carga padrão do módulo: lê o recorte de 2026 do arquivo."""
+    progress = progress or (lambda p: None)
+    if not ACT_FILE.exists() or not CASE_FILE.exists():
+        raise RuntimeError(
+            f"arquivos do recorte não encontrados em {DATA_DIR} "
+            f"({ACT_FILE.name}, {CASE_FILE.name})")
+
+    progress(5)
+    acts = pd.read_csv(ACT_FILE, **_READ)
+    progress(70)
+    cases = pd.read_csv(CASE_FILE, **_READ)
+    progress(85)
+    return build_eventlog(acts, cases)
+
+
+def load_from_db(conn: AgentConnector | None = None, progress=None) -> pd.DataFrame:
+    """Carga por banco — pronta para quando o schema `amparts` for publicado."""
+    progress = progress or (lambda p: None)
+    conn = conn or AgentConnector()
+    if not conn.configured():
+        raise RuntimeError("AGENT_URL/AGENT_API_KEY não configurados")
+
+    periodo = _periodo_where()
+    total = conn.query_df(
+        f"SELECT COUNT(*) AS n FROM {ACT_TABLE} WHERE {periodo}", limit=1)
+    total = max(int(total["n"].iloc[0]) if not total.empty else 1, 1)
+    progress(3)
+
+    acts = conn.paginate_offset(
+        "CASE_KEY, ACTIVITY_EN, EVENTTIME, SORTING, USUARIO, VENDEDOR, "
+        "ORCAMENTO, ORC_ITEM, PEDIDO, PED_ITEM, OS, SAIDA, CLIENTE, "
+        "PRODUTO, PROD_NOME, CONCESSIONARIA, SOURCE_ACTIVITY",
+        ACT_TABLE, order="CASE_KEY, SORTING, EVENTTIME",
+        where=periodo,
+        on_rows=lambda n: progress(3 + 80 * min(n, total) / total))
+    progress(84)
+
+    cases = conn.paginate_offset(
+        "CASE_KEY, ORCAMENTO, ORC_ITEM, PEDIDO, PED_ITEM, OS, SAIDA, CLIENTE, "
+        "CONCESSIONARIA, PROD_NOME, DATA_ORCAMENTO, DATA_PEDIDO, "
+        "ORC_VALOR, PED_QTDE, PED_TOTAL, FAT_TOTAL, FOI_CANCELADO",
+        CASE_TABLE, order="CASE_KEY")
+    progress(90)
+
+    return build_eventlog(acts, cases)

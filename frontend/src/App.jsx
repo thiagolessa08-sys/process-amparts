@@ -33,6 +33,7 @@ const MODULES = [
   { key: "vedara", label: "Veddara-O2C", color: "#0e9f93" },
   { key: "biolab", label: "Biolab-P2P", color: "#e0820e" },
   { key: "cordeiro", label: "Cordeiro-O2C", color: "#7b54ee" },
+  { key: "amparts", label: "AM Parts-O2C", color: "#d4145a" },
 ];
 
 const ACT_MODE_LABEL = { with: "Com", without: "Sem", start: "Inicia em", end: "Termina em" };

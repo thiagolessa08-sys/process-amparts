@@ -382,6 +382,9 @@ def _detail_source(key: str):
     if key == "cordeiro":
         from app.sources import cordeiro as src
         return src
+    if key == "amparts":
+        from app.sources import amparts as src
+        return src
     return None
 
 

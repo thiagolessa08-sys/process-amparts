@@ -9,7 +9,12 @@ __pycache__/
 .pytest_cache/
 
 # Dados gerados
-backend/data/
+# (ignora o CONTEUDO, não a pasta: o git não reinclui arquivo cujo diretório
+#  pai esteja excluído — sem isso a exceção abaixo não funciona)
+backend/data/*
+# exceção: o recorte da AM Parts é a fonte do módulo (não está no banco) e
+# precisa ir junto no deploy. Só estes arquivos — users.json e uploads NÃO.
+!backend/data/amparts_*.csv.gz
 
 # Node / frontend
 frontend/node_modules/

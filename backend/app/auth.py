@@ -24,7 +24,10 @@ DEFAULT_USERS = [
      "pass_sha256": "c3e7f5b672a8fd0dca1c33dc086f12c781e73f8382eaf237d8dc545ce858cbae"},
     {"email": "cordeiro@fluxo.com", "name": "Cordeiro", "modules": ["cordeiro"],
      "pass_sha256": "953dc82f1be1752afcf6b22b75e895eb99c393d54cf14e5f77e0008e53fb9c3d"},
-    {"email": "admin@fluxo.com", "name": "Admin", "modules": ["vedara", "biolab", "cordeiro"],
+    {"email": "amparts@fluxo.com", "name": "AM Parts", "modules": ["amparts"],
+     "pass_sha256": "62ca1778023f0c7266b43186432ff120702fe054bbf58ffcdec17c2ef228e73b"},
+    {"email": "admin@fluxo.com", "name": "Admin",
+     "modules": ["vedara", "biolab", "cordeiro", "amparts"],
      "pass_sha256": "d1cf075905f55ad7676c780045fa33b8391dcb60ac33c5457948ac531c6242e4"},
 ]
 
