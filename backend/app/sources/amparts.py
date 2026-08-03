@@ -154,6 +154,20 @@ def build_eventlog(acts: pd.DataFrame, cases: pd.DataFrame) -> pd.DataFrame:
     })
     log = log.dropna(subset=["timestamp"])
 
+    # Colunas de atributo puro (só alimentam o painel do Case Explorer, não
+    # entram em groupby/filtro do motor) viram `category`: são textos com
+    # repetição altíssima — ex.: source_activity tem 9 valores em 1,1M linhas.
+    # Corta ~750 MB do event log, que sem isso estoura a memória do servidor.
+    # case_id, activity, cliente e resource ficam de fora de propósito: são
+    # usados em groupby/isin pelo mining, e categórico muda o comportamento.
+    # NÃO inclua aqui produto/vendedor/resource/activity/cliente/case_id: entram
+    # em groupby do motor de mineração. Medido — converter as três primeiras
+    # deixou o enrich 41x mais lento (58s -> 2.370s) E alterou o payload.
+    for col in ("produto_cod", "prod_nome", "orcamento", "orc_item", "pedido",
+                "ped_item", "os", "saida", "concessionaria", "source_activity"):
+        if col in log.columns:
+            log[col] = log[col].astype("category")
+
     # valores por caso (somados dos itens do caso) para os 4 KPIs do headline
     if not cases.empty:
         _k = cases["CASE_KEY"].astype(str)

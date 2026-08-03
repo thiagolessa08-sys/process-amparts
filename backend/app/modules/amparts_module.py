@@ -33,16 +33,22 @@ class AmPartsModule(PMModule):
     # RM ficam de fora: só ocorrem nos casos com instalação, e entrariam como
     # não conformidade.
     #
-    # O export passou a separar aprovação manual de liberação automática, e as
-    # posições 25/26/40 ganharam concorrentes. Escolha pela cobertura medida:
-    #   pos 25  APROVOU PEDIDO N1 58,3%  ·  LIBEROU AUTOMATICO N1 6,6%  ·  LIBEROU PEDIDO N1 0,2%
-    #   pos 26  LIBEROU AUTOMATICO N2 65,0%   (LIBEROU PEDIDO N2 nao existe mais)
-    #   pos 40  BAIXA AUTOMATICA 58,9%   ·  APROVOU BAIXA 3,7%  ·  LIBEROU BAIXA 0,0%
-    # Conformidade resultante: 49,1% dos casos.
+    # ATENÇÃO — a origem renomeia atividades entre exports, e isso já zerou a
+    # conformidade duas vezes. Histórico da mesma etapa:
+    #   LIBEROU PEDIDO N2  -> LIBEROU AUTOMATICO N2 -> APROVOU PEDIDO N2
+    #   LIBEROU BAIXA      -> BAIXA AUTOMATICA      -> LIBERACAO FINANCEIRO
+    #   PAGAMENTO          -> PAGAMENTO PEDIDO
+    # Ao trocar a base, confira a cobertura das atividades ANTES de confiar na
+    # conformidade: se ela cair a zero, a causa é esta, não o processo.
+    #
+    # Coberturas medidas no export de 03/08 (conformidade resultante: 58,2%):
+    #   CRIOU ORCAMENTO 88,2% · CONVERTEU ORCAMENTO 64,9% · CRIOU PEDIDO 64,9%
+    #   APROVOU PEDIDO N2 65,0% · APROVOU PEDIDO N1 65,1%
+    #   LIBERACAO FINANCEIRO 62,6% · PAGAMENTO PEDIDO 60,0%
     HAPPY = [
         "CRIOU ORCAMENTO", "CONVERTEU ORCAMENTO", "CRIOU PEDIDO",
-        "APROVOU PEDIDO N1", "LIBEROU AUTOMATICO N2", "BAIXA AUTOMATICA",
-        "PAGAMENTO",
+        "APROVOU PEDIDO N2", "APROVOU PEDIDO N1", "LIBERACAO FINANCEIRO",
+        "PAGAMENTO PEDIDO",
     ]
     CANCEL = {"CANCELOU ORCAMENTO", "CANCELOU PEDIDO", "CANCELOU OS"}
     # retrabalho = cancelamentos + edição de itens + o ciclo de retorno de peça
