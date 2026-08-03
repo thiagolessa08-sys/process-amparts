@@ -28,12 +28,21 @@ class AmPartsModule(PMModule):
     color = "#d4145a"
     dimension = "Cliente"
 
-    # Caminho feliz = espinha comercial de maior volume. O bloco de OS
-    # (ABRIU OS / RECEBEU VEICULO / FINALIZOU OS) e o de RM ficam de fora: só
-    # ocorrem nos casos com instalação, e entrariam como não conformidade.
+    # Caminho feliz = espinha comercial de maior volume, uma atividade por
+    # posição. O bloco de OS (ABRIU OS / RECEBEU VEICULO / FINALIZOU OS) e o de
+    # RM ficam de fora: só ocorrem nos casos com instalação, e entrariam como
+    # não conformidade.
+    #
+    # O export passou a separar aprovação manual de liberação automática, e as
+    # posições 25/26/40 ganharam concorrentes. Escolha pela cobertura medida:
+    #   pos 25  APROVOU PEDIDO N1 58,3%  ·  LIBEROU AUTOMATICO N1 6,6%  ·  LIBEROU PEDIDO N1 0,2%
+    #   pos 26  LIBEROU AUTOMATICO N2 65,0%   (LIBEROU PEDIDO N2 nao existe mais)
+    #   pos 40  BAIXA AUTOMATICA 58,9%   ·  APROVOU BAIXA 3,7%  ·  LIBEROU BAIXA 0,0%
+    # Conformidade resultante: 49,1% dos casos.
     HAPPY = [
         "CRIOU ORCAMENTO", "CONVERTEU ORCAMENTO", "CRIOU PEDIDO",
-        "LIBEROU PEDIDO N1", "LIBEROU PEDIDO N2", "LIBEROU BAIXA", "PAGAMENTO",
+        "APROVOU PEDIDO N1", "LIBEROU AUTOMATICO N2", "BAIXA AUTOMATICA",
+        "PAGAMENTO",
     ]
     CANCEL = {"CANCELOU ORCAMENTO", "CANCELOU PEDIDO", "CANCELOU OS"}
     # retrabalho = cancelamentos + edição de itens + o ciclo de retorno de peça
