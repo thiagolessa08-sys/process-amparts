@@ -54,8 +54,8 @@ function Spark({ data }) {
   );
 }
 
-/* dropdown de múltiplos dias (checkboxes) — filtro "Dia do Pedido" */
-function DayMultiSelect({ days, value, onChange }) {
+/* dropdown de múltiplos dias (checkboxes) — filtro "Dia do <periodo>" */
+function DayMultiSelect({ days, value, onChange, periodo = "Pedido" }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -69,7 +69,7 @@ function DayMultiSelect({ days, value, onChange }) {
     set.has(d) ? set.delete(d) : set.add(d);
     onChange([...set].sort((a, b) => a - b));
   };
-  const label = value.length === 0 ? "Dia do Pedido"
+  const label = value.length === 0 ? `Dia do ${periodo}`
     : value.length === 1 ? `Dia ${value[0]}` : `${value.length} dias`;
   return (
     <div className={"selectwrap daysel" + (value.length ? " active" : "")} ref={ref}>
@@ -98,6 +98,9 @@ function DayMultiSelect({ days, value, onChange }) {
 /* uma faixa: título + filtros + KPIs + exportar */
 function Ribbon({ data, headInfo, filters, setFilter }) {
   const f = data.filters || {};
+  // o backend diz se o período recorta pela data do pedido ou pelo início do
+  // caso — o rótulo tem de acompanhar, senão a tela promete o filtro errado
+  const per = f.periodoLabel || "Pedido";
   const fornVal = filters.fornecedores?.[0] ?? "";
   return (
     <header className="ribbon">
@@ -114,7 +117,7 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
           <div className="selectwrap">
             <span className="lead"><Icon name="calendar" size={14} /></span>
             <select value={filters.ano} onChange={(e) => setFilter({ ano: e.target.value ? Number(e.target.value) : "" })}>
-              <option value="">Ano do Pedido</option>
+              <option value="">Ano do {per}</option>
               {(f.years || []).map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
             <span className="caret"><Icon name="chevronD" size={14} /></span>
@@ -122,13 +125,13 @@ function Ribbon({ data, headInfo, filters, setFilter }) {
           <div className="selectwrap">
             <span className="lead"><Icon name="calendar" size={14} /></span>
             <select value={filters.mes} onChange={(e) => setFilter({ mes: e.target.value ? Number(e.target.value) : "" })}>
-              <option value="">Mês do Pedido</option>
+              <option value="">Mês do {per}</option>
               {(f.months || []).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
             <span className="caret"><Icon name="chevronD" size={14} /></span>
           </div>
           {(f.dias?.length > 0) && (
-            <DayMultiSelect days={f.dias} value={filters.dias || []} onChange={(dias) => setFilter({ dias })} />
+            <DayMultiSelect days={f.dias} value={filters.dias || []} onChange={(dias) => setFilter({ dias })} periodo={per} />
           )}
           <div className="selectwrap supplier">
             <span className="lead"><Icon name="truck" size={14} /></span>

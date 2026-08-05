@@ -68,14 +68,17 @@ class AmPartsModule(PMModule):
     REVERSAL_ACTS = {"RETORNOU PECA"}    # devolução entra na análise de cancelamentos
     PED = "CRIOU PEDIDO"
     FAT = "FATUROU SAIDA"
-    order_activity = PED                 # filtro de período usa a data do pedido
     cancel_month_activity = "CANCELOU PEDIDO"
 
-    # A tela de Cancelamentos recorta o período por conta própria: pela data do
-    # pedido quando o caso tem pedido, e pela do orçamento (1º evento) quando
-    # não tem. Sem isto ela zera sob o filtro de ano — os cancelamentos de
-    # orçamento, que são a maioria, nunca chegam a ter pedido.
-    cancel_periodo_proprio = True
+    # Filtro de período pela MENOR data do caso (1º evento), não pela data do
+    # pedido. Aqui 33,6% dos casos são orçamentos que nunca viraram pedido — com
+    # `order_activity = PED` o filtro descartava esse terço da base em silêncio,
+    # levando junto quase todos os cancelamentos (que, por definição, acontecem
+    # antes de o pedido existir).
+    # Efeito colateral esperado: a conformidade cai de 73,1% para 48,6%. Não é
+    # piora do processo — os 73,1% eram calculados só sobre os casos que viraram
+    # pedido; 48,6% é o número real, incluindo os orçamentos que morreram.
+    order_activity = None
 
     def _headline(self, log, total_cases):
         """4 KPIs da AM Parts: Qtde Unidades, Valor Orçado, Valor Pedido e

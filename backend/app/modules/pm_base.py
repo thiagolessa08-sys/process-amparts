@@ -50,10 +50,6 @@ class PMModule(ProcessModule):
     def ideal_path(self):
         return self.HAPPY
 
-    # A tela de Cancelamentos é recalculada pelo endpoint com um recorte de
-    # período próprio quando o módulo liga esta flag — ver `cancelamentos()`.
-    cancel_periodo_proprio = False
-
     @staticmethod
     def _safe(fn, default):
         try:
@@ -179,6 +175,9 @@ class PMModule(ProcessModule):
             "drill": {},
             "filters": {
                 "variantLabel": "Variante", "dimLabel": self.dimension, "dims": dims,
+                # o filtro de período recorta pela data do pedido ou pelo início
+                # do caso, conforme `order_activity` — o rótulo tem de dizer qual
+                "periodoLabel": "Pedido" if self.order_activity else "Caso",
                 "years": period["years"], "months": period["months"],
                 "dias": dias, "produtos": produtos,
             },

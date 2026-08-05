@@ -66,7 +66,6 @@ def _apply_filters(
     dias: Optional[list[int]] = None,
     produto: Optional[str] = None,
     order_activity: Optional[str] = None,
-    ref_fallback_inicio: bool = False,
 ) -> pd.DataFrame:
     """Filtra o event log por fornecedor/cliente, período, dia e/ou produto.
 
@@ -74,9 +73,6 @@ def _apply_filters(
     (case start), salvo se `order_activity` for informado: nesse caso usa a data
     desse evento (a "data do pedido"), e casos sem esse evento ficam de fora dos
     resultados quando há filtro de período.
-
-    `ref_fallback_inicio=True` mantém os casos sem pedido, datados pelo 1º
-    evento. Usado só pela tela de Cancelamentos (ver o endpoint do payload).
     """
     if fornecedores:
         dim = "fornecedor" if "fornecedor" in log.columns else (
@@ -90,7 +86,7 @@ def _apply_filters(
 
     if ano or mes or dias or start_date or end_date:
         log[TIMESTAMP] = pd.to_datetime(log[TIMESTAMP])
-        ref = _case_ref_date(log, order_activity, ref_fallback_inicio)
+        ref = _case_ref_date(log, order_activity)
 
     if ano or mes or dias:
         valid = ref
@@ -113,23 +109,19 @@ def _apply_filters(
     return log
 
 
-def _case_ref_date(log: pd.DataFrame, order_activity: Optional[str],
-                   fallback_inicio: bool = False) -> pd.Series:
-    """Data de referência por caso: data do evento de pedido (se `order_activity`
-    informado e presente) ou o 1º evento do caso (case start).
+def _case_ref_date(log: pd.DataFrame, order_activity: Optional[str]) -> pd.Series:
+    """Data de referência por caso para os filtros de período.
 
-    `fallback_inicio=True` mantém no índice os casos SEM pedido, datando-os pelo
-    1º evento (na prática, o orçamento). Sem isso eles somem do filtro de
-    período — é o que esconde os cancelamentos de orçamento, que por definição
-    nunca viram pedido.
+    Sem `order_activity`: o 1º evento do caso (case start) — todo caso tem data.
+    Com `order_activity`: a data desse evento; casos que não o têm ficam FORA do
+    resultado quando há filtro de período. Só use quando "data do pedido" for
+    mesmo o recorte desejado e a ausência de pedido puder ser ignorada.
     """
-    inicio = log.groupby(CASE_ID)[TIMESTAMP].min()
     if order_activity:
         ped = log[log["activity"] == order_activity]
         if not ped.empty:
-            ref = ped.groupby(CASE_ID)[TIMESTAMP].min()
-            return ref.reindex(inicio.index).fillna(inicio) if fallback_inicio else ref
-    return inicio
+            return ped.groupby(CASE_ID)[TIMESTAMP].min()
+    return log.groupby(CASE_ID)[TIMESTAMP].min()
 
 
 def _seq_key(activities: list[str]) -> str:
@@ -329,23 +321,6 @@ def get_module(
     if log.empty or log[CASE_ID].nunique() == 0:
         raise HTTPException(status_code=422, detail="Nenhum caso encontrado para os filtros aplicados")
     payload = module.enrich(log)
-
-    # A tela de Cancelamentos usa recorte de período próprio nos módulos que
-    # pedem: o filtro padrão data o caso pela data do pedido, e cancelamento de
-    # orçamento nunca vira pedido — sem isto a tela zera quando há filtro de ano
-    # ou mês, mesmo com milhares de cancelamentos na base.
-    if getattr(module, "cancel_periodo_proprio", False) and (
-            ano or mes or dias or start_date or end_date):
-        log_c = _apply_filters(data_source.get_log(module_key=key), fornecedores,
-                               start_date, end_date, ano, mes, dias, produto,
-                               order_activity=module.order_activity,
-                               ref_fallback_inicio=True)
-        log_c = _apply_activity_filter(log_c, module, act_id, act_mode)
-        log_c = _apply_variant_filter(log_c, module, variant, variant_mode)
-        if not log_c.empty:
-            payload["cancelamentos"] = module._safe(
-                lambda: module.cancelamentos(log_c), payload.get("cancelamentos", {}))
-
     # chave de variante (assinatura da sequência) p/ o front filtrar pela seleção
     for v in payload.get("variants", []):
         path = v.get("path") or []
