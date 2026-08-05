@@ -41,14 +41,18 @@ class AmPartsModule(PMModule):
     # Ao trocar a base, confira a cobertura das atividades ANTES de confiar na
     # conformidade: se ela cair a zero, a causa é esta, não o processo.
     #
-    # Coberturas medidas no export de 03/08 (conformidade resultante: 58,2%):
-    #   CRIOU ORCAMENTO 88,2% · CONVERTEU ORCAMENTO 64,9% · CRIOU PEDIDO 64,9%
-    #   APROVOU PEDIDO N2 65,0% · APROVOU PEDIDO N1 65,1%
-    #   LIBERACAO FINANCEIRO 62,6% · PAGAMENTO PEDIDO 60,0%
+    # O export de 04/08 REVERTEU a nomenclatura do de 03/08 (APROVOU PEDIDO N2
+    # voltou a LIBEROU AUTOMATICO N2, LIBERACAO FINANCEIRO a BAIXA AUTOMATICA e
+    # PAGAMENTO PEDIDO a PAGAMENTO). Vai e volta — nao e evolucao, e instabilidade.
+    #
+    # Coberturas medidas no export de 04/08 (conformidade resultante: 48,7%):
+    #   CRIOU ORCAMENTO 87,4% · CONVERTEU ORCAMENTO 64,1% · CRIOU PEDIDO 66,4%
+    #   APROVOU PEDIDO N1 59,3% · LIBEROU AUTOMATICO N2 66,0%
+    #   BAIXA AUTOMATICA 61,9% · PAGAMENTO 59,6%
     HAPPY = [
         "CRIOU ORCAMENTO", "CONVERTEU ORCAMENTO", "CRIOU PEDIDO",
-        "APROVOU PEDIDO N2", "APROVOU PEDIDO N1", "LIBERACAO FINANCEIRO",
-        "PAGAMENTO PEDIDO",
+        "APROVOU PEDIDO N1", "LIBEROU AUTOMATICO N2", "BAIXA AUTOMATICA",
+        "PAGAMENTO",
     ]
     CANCEL = {"CANCELOU ORCAMENTO", "CANCELOU PEDIDO", "CANCELOU OS"}
     # retrabalho = cancelamentos + edição de itens + o ciclo de retorno de peça
@@ -66,6 +70,12 @@ class AmPartsModule(PMModule):
     FAT = "FATUROU SAIDA"
     order_activity = PED                 # filtro de período usa a data do pedido
     cancel_month_activity = "CANCELOU PEDIDO"
+
+    # A tela de Cancelamentos recorta o período por conta própria: pela data do
+    # pedido quando o caso tem pedido, e pela do orçamento (1º evento) quando
+    # não tem. Sem isto ela zera sob o filtro de ano — os cancelamentos de
+    # orçamento, que são a maioria, nunca chegam a ter pedido.
+    cancel_periodo_proprio = True
 
     def _headline(self, log, total_cases):
         """4 KPIs da AM Parts: Qtde Unidades, Valor Orçado, Valor Pedido e
