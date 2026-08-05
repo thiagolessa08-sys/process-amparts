@@ -50,12 +50,26 @@ class PMModule(ProcessModule):
     def ideal_path(self):
         return self.HAPPY
 
+    # A tela de Cancelamentos é recalculada pelo endpoint com um recorte de
+    # período próprio quando o módulo liga esta flag — ver `cancelamentos()`.
+    cancel_periodo_proprio = False
+
     @staticmethod
     def _safe(fn, default):
         try:
             return fn()
         except Exception:
             return default
+
+    def cancelamentos(self, log: pd.DataFrame) -> dict:
+        """Análise de cancelamentos de um event log já filtrado.
+
+        Isolada do `enrich` porque a tela precisa de um recorte de período
+        diferente do resto: o filtro padrão data o caso pela data do pedido, e
+        caso cancelado no orçamento nunca vira pedido — sumiria daqui.
+        """
+        labels = {a: _title(a) for a in log["activity"].astype(str).unique()}
+        return cancel_analysis(log, self.CANCEL | self.REVERSAL_ACTS, labels)
 
     def enrich(self, log: pd.DataFrame) -> dict:
         HAPPY, CANCEL, BRANCH_PARENT = self.HAPPY, self.CANCEL, self.BRANCH_PARENT
@@ -157,8 +171,7 @@ class PMModule(ProcessModule):
                 # E alterações), não só os cancelamentos. Cordeiro: REWORK_ACTS = CANCEL.
                 lambda: rework(log, "cliente", labels, top=60,
                            also_rework_acts=self.REWORK_ACTS, allowed_acts=self.REWORK_ACTS), {}),
-            "cancelamentos": self._safe(
-                lambda: cancel_analysis(log, self.CANCEL | self.REVERSAL_ACTS, labels), {}),
+            "cancelamentos": self._safe(lambda: self.cancelamentos(log), {}),
             "twoMatch": self._safe(
                 lambda: two_match(log, "cliente", invoice_activity=self.FAT, order_activity=self.PED),
                 {"monthly": [], "pendentes": []}),
