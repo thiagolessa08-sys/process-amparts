@@ -19,7 +19,7 @@ def two_match(log: pd.DataFrame, dim_col: str,
     `invoice_activity`: atividade que marca a fatura (efetivado).
     `order_activity`: se informado, a base são apenas os casos que têm essa
     atividade (o pedido) e o mês de referência é a data do pedido — em vez do
-    1º evento do caso (que, p.ex. no Vedara, é o orçamento).
+    1º evento do caso (que, no O2C, costuma ser o orçamento).
     """
     log = log.copy()
     log[TIMESTAMP] = pd.to_datetime(log[TIMESTAMP])

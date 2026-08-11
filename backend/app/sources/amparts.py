@@ -1,21 +1,23 @@
 """Event log AM Parts (O2C de acessórios automotivos, com Ordem de Serviço).
 
-Origem: export SQL_PM_ATIVIDADES (eventos) + SQL_PM_CASES (atributos por caso),
-no mesmo formato do Veddara/Cordeiro — o event log já vem pronto, uma linha por
-evento com case key, atividade, timestamp e ordenação. O processo tem uma etapa
+Origem: export SQL_PM_ATIVIDADES (eventos) + SQL_PM_CASES (atributos por caso)
+— o event log já vem pronto, uma linha por evento com case key, atividade,
+timestamp e ordenação. O processo tem uma etapa
 a mais que o O2C clássico: a Ordem de Serviço (abertura, recebimento do veículo,
 finalização) entre o pedido e o faturamento da saída.
 
-Diferente dos outros módulos, a AM Parts **não está no banco**: os dados vêm de
-arquivo. Nesta primeira fase carregamos apenas o recorte de **2026** (905k
-eventos / 119k casos), gerado a partir do export completo. `load_from_db()`
-fica pronta para quando as tabelas forem publicadas no schema `amparts`.
+Duas fontes, na ordem: **MySQL** (`amparts.SQL_PM_*`) quando as variáveis
+AMPARTS_DB_* estiverem no ambiente, e o recorte em **arquivo** como contingência.
+
+Em ambos os casos carregamos apenas o recorte de um ano (ver ANO): o banco tem
+3,4M eventos entre 2023 e 2029, e o volume total não cabe no plano de memória
+do servidor.
 """
 from pathlib import Path
 
 import pandas as pd
 
-from ..connectors.agent_connector import AgentConnector
+from ..connectors.mysql_connector import MySQLConnector
 
 SCHEMA = "amparts"
 ACT_TABLE = f"{SCHEMA}.SQL_PM_ATIVIDADES"
@@ -212,8 +214,30 @@ def _ordena_por_sorting(log: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def load_amparts_eventlog(conn: AgentConnector | None = None, progress=None) -> pd.DataFrame:
-    """Carga padrão do módulo: lê o recorte de 2026 do arquivo."""
+ACT_COLS = ("CASE_KEY, ACTIVITY_EN, EVENTTIME, SORTING, USUARIO, VENDEDOR, "
+            "ORCAMENTO, ORC_ITEM, PEDIDO, PED_ITEM, OS, SAIDA, CLIENTE, "
+            "PRODUTO, PROD_NOME, CONCESSIONARIA, SOURCE_ACTIVITY")
+CASE_COLS = ("CASE_KEY, ORCAMENTO, ORC_ITEM, PEDIDO, PED_ITEM, OS, SAIDA, CLIENTE, "
+             "CONCESSIONARIA, PROD_NOME, DATA_ORCAMENTO, DATA_PEDIDO, "
+             "ORC_VALOR, PED_QTDE, PED_TOTAL, FAT_TOTAL, FOI_CANCELADO")
+
+
+def load_amparts_eventlog(conn: MySQLConnector | None = None, progress=None) -> pd.DataFrame:
+    """Carga padrão do módulo.
+
+    Banco quando AMPARTS_DB_* estiver configurado; senão, o recorte em arquivo.
+    O arquivo continua no repositório de propósito: é o caminho de contingência
+    quando o banco está fora, e o que faz os testes e o dev local rodarem sem
+    credencial nenhuma.
+    """
+    db = conn or MySQLConnector()
+    if db.configured():
+        return load_from_db(db, progress=progress)
+    return load_from_csv(progress=progress)
+
+
+def load_from_csv(progress=None) -> pd.DataFrame:
+    """Carga do recorte de 2026 em arquivo."""
     progress = progress or (lambda p: None)
     if not ACT_FILE.exists() or not CASE_FILE.exists():
         raise RuntimeError(
@@ -228,33 +252,34 @@ def load_amparts_eventlog(conn: AgentConnector | None = None, progress=None) -> 
     return build_eventlog(acts, cases)
 
 
-def load_from_db(conn: AgentConnector | None = None, progress=None) -> pd.DataFrame:
-    """Carga por banco — pronta para quando o schema `amparts` for publicado."""
+def load_from_db(conn: MySQLConnector | None = None, progress=None) -> pd.DataFrame:
+    """Carga por banco (MySQL direto)."""
     progress = progress or (lambda p: None)
-    conn = conn or AgentConnector()
+    conn = conn or MySQLConnector()
     if not conn.configured():
-        raise RuntimeError("AGENT_URL/AGENT_API_KEY não configurados")
+        raise RuntimeError(
+            "AMPARTS_DB_HOST/USER/PASSWORD não configurados")
 
     periodo = _periodo_where()
-    total = conn.query_df(
-        f"SELECT COUNT(*) AS n FROM {ACT_TABLE} WHERE {periodo}", limit=1)
+    total = conn.query_df(f"SELECT COUNT(*) AS n FROM {ACT_TABLE} WHERE {periodo}")
     total = max(int(total["n"].iloc[0]) if not total.empty else 1, 1)
     progress(3)
 
-    acts = conn.paginate_offset(
-        "CASE_KEY, ACTIVITY_EN, EVENTTIME, SORTING, USUARIO, VENDEDOR, "
-        "ORCAMENTO, ORC_ITEM, PEDIDO, PED_ITEM, OS, SAIDA, CLIENTE, "
-        "PRODUTO, PROD_NOME, CONCESSIONARIA, SOURCE_ACTIVITY",
-        ACT_TABLE, order="CASE_KEY, SORTING, EVENTTIME",
-        where=periodo,
-        on_rows=lambda n: progress(3 + 80 * min(n, total) / total))
-    progress(84)
+    # Sem ORDER BY de propósito: `build_eventlog` termina em `_ordena_por_sorting`,
+    # que reordena tudo em pandas. Pedir a ordenação ao MySQL 5.6 obrigaria um
+    # filesort com tabela temporária em disco sobre ~1,1M linhas, sem ganho algum.
+    acts = conn.stream_df(
+        ACT_COLS, ACT_TABLE, where=periodo,
+        on_rows=lambda n: progress(3 + 78 * min(n, total) / total))
+    progress(82)
 
-    cases = conn.paginate_offset(
-        "CASE_KEY, ORCAMENTO, ORC_ITEM, PEDIDO, PED_ITEM, OS, SAIDA, CLIENTE, "
-        "CONCESSIONARIA, PROD_NOME, DATA_ORCAMENTO, DATA_PEDIDO, "
-        "ORC_VALOR, PED_QTDE, PED_TOTAL, FAT_TOTAL, FOI_CANCELADO",
-        CASE_TABLE, order="CASE_KEY")
+    cases = conn.stream_df(CASE_COLS, CASE_TABLE)
     progress(90)
+
+    # A tabela de casos cobre 2023–2029 inteiros (363k linhas), enquanto o event
+    # log está recortado no período. Sem este filtro a tela Detalhes passaria a
+    # listar casos fora da janela — o CSV, por já vir recortado, nunca fez isso.
+    if not cases.empty and not acts.empty:
+        cases = cases[cases["CASE_KEY"].isin(acts["CASE_KEY"].unique())]
 
     return build_eventlog(acts, cases)

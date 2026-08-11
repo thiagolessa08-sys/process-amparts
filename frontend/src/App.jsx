@@ -30,9 +30,6 @@ const SCREENS = [
 const EMPTY_FILTERS = { fornecedores: [], startDate: "", endDate: "", ano: "", mes: "", dias: [], produto: "", activity: null, variantKeys: [], variantMode: "include" };
 
 const MODULES = [
-  { key: "vedara", label: "Veddara-O2C", color: "#0e9f93" },
-  { key: "biolab", label: "Biolab-P2P", color: "#e0820e" },
-  { key: "cordeiro", label: "Cordeiro-O2C", color: "#7b54ee" },
   { key: "amparts", label: "AM Parts-O2C", color: "#d4145a" },
 ];
 
@@ -217,7 +214,7 @@ function Toast({ msg }) {
 
 export default function App() {
   const [auth, setAuth]       = useState(() => readAuth());
-  const [moduleKey, setModuleKey] = useState(() => readAuth()?.modules?.[0] || "vedara");
+  const [moduleKey, setModuleKey] = useState(() => readAuth()?.modules?.[0] || "amparts");
   const [screen, setScreen]   = useState(() => {
     const s = readAuth()?.screens;
     return s?.length ? s[0] : "explorer";   // usuário restrito cai na 1ª tela liberada
@@ -342,7 +339,7 @@ export default function App() {
         onToggleTheme={() => setDark((d) => !d)}
         onLogin={(user) => {
           setAuth(user);
-          setModuleKey(user.modules?.[0] || "vedara");
+          setModuleKey(user.modules?.[0] || "amparts");
           setScreen(user.screens?.length ? user.screens[0] : "explorer");
         }}
       />
@@ -406,7 +403,7 @@ export default function App() {
             <div className="file-card">
               <span className="fi"><Icon name="database" size={16} /></span>
               <div>
-                <div className="fn">{data?.short || "Veddara-O2C"} · banco</div>
+                <div className="fn">{data?.short || "AM Parts-O2C"} · arquivo</div>
                 <div className="fs">{data ? `${data.totalCases.toLocaleString("pt-BR")} casos` : "—"}</div>
               </div>
             </div>

@@ -4,7 +4,7 @@ Cada caso traz um resumo (nº de atividades, throughput, primeira/última
 atividade e timestamps) e a timeline completa de atividades com o intervalo
 até a atividade anterior. Reativo aos filtros aplicados antes de chamar.
 
-Em escala (Cordeiro ~207k casos) a parte cara é ordenar/resumir o log inteiro.
+Em escala (centenas de milhares de casos) a parte cara é ordenar/resumir o log inteiro.
 Por isso ela é separada (`build_case_index`) e cacheada pelo chamador; cada
 requisição de busca/página chama só `page_cases`, que filtra a lista de casos
 e monta a timeline detalhada APENAS da página devolvida.

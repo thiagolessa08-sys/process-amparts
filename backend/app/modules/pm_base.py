@@ -164,7 +164,7 @@ class PMModule(ProcessModule):
             "overview": self._safe(lambda: self._overview(log), {}),
             "rework": self._safe(
                 # toda atividade de retrabalho conta cada ocorrência (cancelamentos
-                # E alterações), não só os cancelamentos. Cordeiro: REWORK_ACTS = CANCEL.
+                # E alterações), não só os cancelamentos — ver REWORK_ACTS do módulo.
                 lambda: rework(log, "cliente", labels, top=60,
                            also_rework_acts=self.REWORK_ACTS, allowed_acts=self.REWORK_ACTS), {}),
             "cancelamentos": self._safe(lambda: self.cancelamentos(log), {}),

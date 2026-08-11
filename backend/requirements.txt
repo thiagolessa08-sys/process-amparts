@@ -1,6 +1,10 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pandas==2.2.2
+# driver do banco do AM Parts. `cryptography` NÃO entra aqui: o servidor é MySQL
+# 5.6, que só faz mysql_native_password. Se ele for para o 8.x (caching_sha2_
+# password), o pymysql passa a exigir `cryptography` e o login falha sem ela.
+PyMySQL==1.2.0
 httpx==0.27.2
 pytest==8.3.2
 python-multipart==0.0.9

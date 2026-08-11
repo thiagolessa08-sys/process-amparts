@@ -3,4 +3,6 @@ builder = "nixpacks"
 buildCommand = "npm install && npm run build"
 
 [deploy]
-startCommand = "npx serve dist -l $PORT"
+# `dist` (não `dist/amparts`): o build sai em dist/amparts, então servir a pasta
+# `dist` expõe o app exatamente em /amparts. O serve.json redireciona a raiz.
+startCommand = "npx --no-install serve dist -l $PORT -c ../serve.json"

@@ -1,0 +1,67 @@
+# Gateway de roteamento por path do www.processintelligence.com.br
+#
+# O domínio aponta para ESTE serviço. Ele repassa cada prefixo para o serviço
+# Railway do projeto correspondente.
+#
+# Por que não há reescrita de path: cada frontend é compilado com
+# `base: '/<prefixo>/'` no vite.config.js e servido a partir de `dist/<prefixo>`,
+# ou seja, já responde no próprio prefixo. O gateway é repasse puro. Se algum dia
+# um app for compilado para a raiz, ele NÃO funcionará aqui sem um handle_path
+# (que remove o prefixo) — e os assets vão quebrar.
+#
+# Para adicionar um projeto: copie um bloco `handle`, troque o prefixo e o host.
+
+{
+	admin off
+	# o TLS é terminado pela borda do Railway; aqui dentro é HTTP puro
+	auto_https off
+	log {
+		format console
+	}
+}
+
+:{$PORT:8080} {
+	encode gzip
+
+	@amparts path /amparts /amparts/*
+
+	# `route` preserva a ordem escrita aqui. Fora dele o Caddy reordena os
+	# `handle` por especificidade do matcher, o que com matcher nomeado fica
+	# ambíguo — e o `handle` vazio do final poderia engolir tudo.
+	route {
+		# health check do Railway — responde sem depender de nenhum upstream
+		handle /health {
+			respond "ok" 200
+		}
+
+		# ───────── AM Parts ─────────
+		# O matcher cobre as duas formas: /amparts (sem barra) e /amparts/*.
+		# Só /amparts/* deixaria a URL sem barra final cair no 404 do final.
+		handle @amparts {
+			reverse_proxy https://amparts.up.railway.app {
+				# obrigatório: a borda do Railway roteia pelo Host, não pelo IP.
+				# Sem isto, o upstream recebe Host=www.processintelligence.com.br
+				# e o Railway não sabe para qual serviço entregar.
+				header_up Host amparts.up.railway.app
+			}
+		}
+
+		# ───────── próximos projetos ─────────
+		# Declare o matcher junto de @amparts, lá em cima, e o handle aqui:
+		# handle @cordeiro {
+		# 	reverse_proxy https://cordeiro.up.railway.app {
+		# 		header_up Host cordeiro.up.railway.app
+		# 	}
+		# }
+
+		# raiz do domínio: por ora manda para o AM Parts. Quando houver mais de
+		# um projeto, troque por uma página de índice.
+		handle / {
+			redir /amparts/ 302
+		}
+
+		handle {
+			respond "404 — projeto não encontrado neste domínio" 404
+		}
+	}
+}

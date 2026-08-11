@@ -1,8 +1,8 @@
 """Mantem qual event log esta ativo.
 
-A fonte real (Vedara, banco via agent) é carregada UMA vez em background
-(thread), nunca dentro do request HTTP — para não estourar memória/timeout no
-servidor de produção. Um CSV enviado por upload sobrepõe a fonte real.
+A fonte real (AM Parts, arquivo) é carregada UMA vez em background (thread),
+nunca dentro do request HTTP — para não estourar memória/timeout no servidor de
+produção. Um CSV enviado por upload sobrepõe a fonte real.
 """
 import importlib
 import threading
@@ -11,11 +11,8 @@ import pandas as pd
 
 from app.connectors.csv_connector import CSVConnector
 
-# fontes reais (banco via agent): módulo:função do loader
+# fontes reais: módulo:função do loader
 REAL_LOADERS = {
-    "vedara": ("app.sources.vedara", "load_vedara_eventlog"),
-    "biolab": ("app.sources.biolab", "load_biolab_eventlog"),
-    "cordeiro": ("app.sources.cordeiro", "load_cordeiro_eventlog"),
     "amparts": ("app.sources.amparts", "load_amparts_eventlog"),
 }
 
@@ -96,7 +93,7 @@ def refresh(module_key: str) -> None:
 
 
 # ── API geral ────────────────────────────────────────────────────────────────
-def get_log(module_key: str = "vedara") -> pd.DataFrame:
+def get_log(module_key: str = "amparts") -> pd.DataFrame:
     # CSV enviado por upload sobrepõe a fonte real
     if _state["path"] is not None:
         return CSVConnector(_state["path"]).load()

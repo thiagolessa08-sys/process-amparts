@@ -103,7 +103,7 @@ export function CaseExplorerScreen({ data, filters }) {
   const [selectedId, setSelectedId] = useState(null);
   const [query, setQuery] = useState("");
 
-  // busca por Case Id é server-side (escala p/ Cordeiro ~207k casos); debounce 300ms
+  // busca por Case Id é server-side (escala p/ centenas de milhares de casos); debounce 300ms
   useEffect(() => {
     let alive = true;
     setLoading(true); setError(null);

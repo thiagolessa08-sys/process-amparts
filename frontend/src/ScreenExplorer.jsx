@@ -48,14 +48,12 @@ function freqColor(t) {
 const IDEAL_BY_MODULE = {
   p2p: ["req", "po", "alter", "approve", "goods", "invoice", "pay"],
   o2c: ["order", "credit", "hold", "pick", "deliver", "invoice", "receive"],
-  cordeiro: ["orcamento", "aprov_orc", "pedido", "aprov_ped", "fatura", "aprov_fat"],
 };
 
 // ramos laterais por módulo: id do nó-ramo -> id do nó da espinha de onde sai.
 // Variantes que passam por um ramo desviam visivelmente da espinha central.
-const BRANCH_BY_MODULE = {
-  cordeiro: { canc_orc: "orcamento", canc_ped: "pedido", canc_fat: "fatura" },
-};
+// O AM Parts é data-driven: os ramos vêm em graphData.branchMap.
+const BRANCH_BY_MODULE = {};
 
 /* ───────── subgrafo da união das variantes selecionadas ───────── */
 export function buildSubgraph(data, selectedIds) {

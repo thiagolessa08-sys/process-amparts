@@ -40,7 +40,8 @@ ALLOWED_ORIGINS = os.environ.get(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://(.*\.railway\.app|(.*\.)?ma3processmining\.com\.br)",
+    allow_origin_regex=r"https://(.*\.railway\.app|(.*\.)?ma3processmining\.com\.br"
+                       r"|(.*\.)?processintelligence\.com\.br)",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -48,9 +49,12 @@ app.add_middleware(
 
 @app.on_event("startup")
 def _prewarm():
-    """Pré-aquece os logs das fontes reais (carga ~90s do agent) em background,
-    para o usuário não esperar no primeiro clique. Silencioso se o agent estiver fora."""
-    if os.environ.get("CORDEIRO_PREWARM", "1") != "1":
+    """Pré-aquece os logs das fontes reais em background, para o usuário não
+    esperar no primeiro clique. Silencioso se a fonte estiver indisponível."""
+    # CORDEIRO_PREWARM é o nome antigo da variável, aceito para não reativar o
+    # prewarm em ambientes que já a tinham desligada.
+    flag = os.environ.get("PREWARM") or os.environ.get("CORDEIRO_PREWARM", "1")
+    if flag != "1":
         return
     for key in data_source.REAL_LOADERS:
         data_source.start_real_load(key)
@@ -175,7 +179,7 @@ def _apply_activity_filter(log: pd.DataFrame, module, act_id, act_mode) -> pd.Da
 
 
 def _guard_real(key: str) -> None:
-    """Fonte real (Vedara): carga assíncrona. Nunca bloqueia/recarrega
+    """Fonte real (AM Parts): carga assíncrona. Nunca bloqueia/recarrega
     dentro do request — devolve 503 enquanto carrega (o front reexibe e reconsulta)."""
     if not data_source.is_real(key) or data_source._state["path"] is not None:
         return
@@ -183,12 +187,13 @@ def _guard_real(key: str) -> None:
     if st == "ready":
         return
     data_source.start_real_load(key)
-    label = key.capitalize()
+    module = module_registry.get(key)
+    label = getattr(module, "name", None) or key.capitalize()
     if st == "error":
         raise HTTPException(status_code=503,
-                            detail=f"Falha ao carregar {label} do banco: {data_source.real_error(key)}")
+                            detail=f"Falha ao carregar {label}: {data_source.real_error(key)}")
     raise HTTPException(status_code=503,
-                        detail=f"Carregando dados do {label} do banco… aguarde ~1–2 min e recarregue.")
+                        detail=f"Carregando dados do {label}… aguarde ~1–2 min e recarregue.")
 
 
 @app.get("/api/health")
@@ -222,8 +227,8 @@ def debug_config():
         "agent_api_key_set": bool(key),
         "agent_api_key_len": len(key),
         "anthropic_key_set": bool(os.environ.get("ANTHROPIC_API_KEY")),
-        "vedara_status": data_source.real_status("vedara"),
-        "vedara_error": data_source.real_error("vedara"),
+        "amparts_status": data_source.real_status("amparts"),
+        "amparts_error": data_source.real_error("amparts"),
     }
 
 
@@ -378,15 +383,6 @@ def get_cases(
 
 def _detail_source(key: str):
     """Fonte da tela Detalhes por módulo (expõe DETAIL_COLS + get_cases_detail)."""
-    if key == "vedara":
-        from app.sources import vedara as src
-        return src
-    if key == "biolab":
-        from app.sources import biolab as src
-        return src
-    if key == "cordeiro":
-        from app.sources import cordeiro as src
-        return src
     if key == "amparts":
         from app.sources import amparts as src
         return src
