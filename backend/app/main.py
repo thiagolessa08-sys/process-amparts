@@ -40,8 +40,12 @@ ALLOWED_ORIGINS = os.environ.get(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    # Todo domínio novo por onde o frontend for servido precisa entrar aqui: sem
+    # isso o navegador reprova o preflight e a tela mostra "Failed to fetch",
+    # sem status HTTP — indistinguível de backend fora do ar. Ver test_cors.py.
     allow_origin_regex=r"https://(.*\.railway\.app|(.*\.)?ma3processmining\.com\.br"
-                       r"|(.*\.)?processintelligence\.com\.br)",
+                       r"|(.*\.)?processintelligence\.com\.br"
+                       r"|(.*\.)?ampartsia\.com\.br)",
     allow_methods=["*"],
     allow_headers=["*"],
 )

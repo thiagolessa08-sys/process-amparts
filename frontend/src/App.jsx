@@ -35,6 +35,17 @@ const MODULES = [
 
 const ACT_MODE_LABEL = { with: "Com", without: "Sem", start: "Inicia em", end: "Termina em" };
 
+/* Módulo a abrir: o 1º do usuário que AINDA existe em MODULES.
+   Sem o cruzamento, uma sessão salva antes de um módulo ser removido continua
+   mandando a tela pedir /api/modules/<removido>, que responde 403 "Sem acesso a
+   este módulo" — com a barra exibindo só o módulo certo, o que esconde a causa.
+   Nunca leia `modules[0]` do localStorage direto. */
+function firstModule(user) {
+  const permitidos = user?.modules || [];
+  const valido = MODULES.find((m) => permitidos.includes(m.key));
+  return (valido || MODULES[0]).key;
+}
+
 /* mini-gráfico do KPI */
 function Spark({ data }) {
   if (!data?.length) return null;
@@ -214,7 +225,7 @@ function Toast({ msg }) {
 
 export default function App() {
   const [auth, setAuth]       = useState(() => readAuth());
-  const [moduleKey, setModuleKey] = useState(() => readAuth()?.modules?.[0] || "amparts");
+  const [moduleKey, setModuleKey] = useState(() => firstModule(readAuth()));
   const [screen, setScreen]   = useState(() => {
     const s = readAuth()?.screens;
     return s?.length ? s[0] : "explorer";   // usuário restrito cai na 1ª tela liberada
@@ -339,7 +350,7 @@ export default function App() {
         onToggleTheme={() => setDark((d) => !d)}
         onLogin={(user) => {
           setAuth(user);
-          setModuleKey(user.modules?.[0] || "amparts");
+          setModuleKey(firstModule(user));
           setScreen(user.screens?.length ? user.screens[0] : "explorer");
         }}
       />
