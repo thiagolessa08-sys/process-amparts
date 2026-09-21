@@ -6,8 +6,8 @@ timestamp e ordenação. O processo tem uma etapa
 a mais que o O2C clássico: a Ordem de Serviço (abertura, recebimento do veículo,
 finalização) entre o pedido e o faturamento da saída.
 
-Duas fontes, na ordem: **MySQL** (`amparts.SQL_PM_*`) quando as variáveis
-AMPARTS_DB_* estiverem no ambiente, e o recorte em **arquivo** como contingência.
+Duas fontes, na ordem: **MySQL** (`amparts.SQL_PM_*`) quando PM_DB_PASSWORD
+estiver no ambiente, e o recorte em **arquivo** como contingência.
 
 Em ambos os casos carregamos apenas o recorte de um ano (ver ANO): o banco tem
 3,4M eventos entre 2023 e 2029, e o volume total não cabe no plano de memória
@@ -81,11 +81,22 @@ EVENT_ATTRS = [
 ]
 
 _CASES_DETAIL: pd.DataFrame | None = None
+_ORIGEM: str | None = None
 
 
 def get_cases_detail() -> pd.DataFrame:
     """DataFrame de detalhe (uma linha por caso) da SQL_PM_CASES, ou vazio."""
     return _CASES_DETAIL if _CASES_DETAIL is not None else pd.DataFrame()
+
+
+def get_origem() -> str | None:
+    """"db" | "csv" — de onde veio o log em memória (None antes da 1ª carga).
+
+    Cair no CSV é silencioso por design (é contingência), e em produção isso
+    significa servir o recorte congelado achando que é o banco. Exposto em
+    /api/debug/config justamente para esse caso ficar visível depois do deploy.
+    """
+    return _ORIGEM
 
 
 def _num(s):
@@ -225,7 +236,7 @@ CASE_COLS = ("CASE_KEY, ORCAMENTO, ORC_ITEM, PEDIDO, PED_ITEM, OS, SAIDA, CLIENT
 def load_amparts_eventlog(conn: MySQLConnector | None = None, progress=None) -> pd.DataFrame:
     """Carga padrão do módulo.
 
-    Banco quando AMPARTS_DB_* estiver configurado; senão, o recorte em arquivo.
+    Banco quando PM_DB_PASSWORD estiver configurada; senão, o recorte em arquivo.
     O arquivo continua no repositório de propósito: é o caminho de contingência
     quando o banco está fora, e o que faz os testes e o dev local rodarem sem
     credencial nenhuma.
@@ -233,11 +244,17 @@ def load_amparts_eventlog(conn: MySQLConnector | None = None, progress=None) -> 
     db = conn or MySQLConnector()
     if db.configured():
         return load_from_db(db, progress=progress)
+    # o fallback não levanta erro (é contingência), então sem esta linha o
+    # deploy serve dado congelado sem sinal nenhum nos logs do Railway.
+    print("[amparts] PM_DB_PASSWORD ausente — servindo o recorte em CSV, "
+          "não o MySQL")
     return load_from_csv(progress=progress)
 
 
 def load_from_csv(progress=None) -> pd.DataFrame:
     """Carga do recorte de 2026 em arquivo."""
+    global _ORIGEM
+    _ORIGEM = "csv"
     progress = progress or (lambda p: None)
     if not ACT_FILE.exists() or not CASE_FILE.exists():
         raise RuntimeError(
@@ -254,11 +271,12 @@ def load_from_csv(progress=None) -> pd.DataFrame:
 
 def load_from_db(conn: MySQLConnector | None = None, progress=None) -> pd.DataFrame:
     """Carga por banco (MySQL direto)."""
+    global _ORIGEM
+    _ORIGEM = "db"
     progress = progress or (lambda p: None)
     conn = conn or MySQLConnector()
     if not conn.configured():
-        raise RuntimeError(
-            "AMPARTS_DB_HOST/USER/PASSWORD não configurados")
+        raise RuntimeError("PM_DB_PASSWORD não configurada")
 
     periodo = _periodo_where()
     total = conn.query_df(f"SELECT COUNT(*) AS n FROM {ACT_TABLE} WHERE {periodo}")

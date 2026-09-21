@@ -222,9 +222,17 @@ def statistics():
 
 @app.get("/api/debug/config")
 def debug_config():
-    """Diagnóstico seguro: mostra o que o backend enxerga, sem vazar a chave."""
+    """Diagnóstico seguro: mostra o que o backend enxerga, sem vazar a chave.
+
+    Endpoint é público, então nada de host/usuário do banco aqui — só os
+    booleanos que respondem "por que o Railway não está lendo do MySQL?".
+    """
+    from app.connectors.mysql_connector import MySQLConnector
+    from app.sources.amparts import get_origem
+
     url = os.environ.get("AGENT_URL", "")
     key = os.environ.get("AGENT_API_KEY", "")
+    db = MySQLConnector()
     return {
         "agent_url_set": bool(url),
         "agent_url_host": url.split("//")[-1].split("/")[0] if url else None,
@@ -233,6 +241,11 @@ def debug_config():
         "anthropic_key_set": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "amparts_status": data_source.real_status("amparts"),
         "amparts_error": data_source.real_error("amparts"),
+        # "db" = leu do MySQL; "csv" = caiu na contingência (dado congelado)
+        "amparts_origem": get_origem(),
+        "db_password_set": bool(db.password),
+        "db_name": db.database,
+        "db_ca_set": bool(db.ca),
     }
 
 

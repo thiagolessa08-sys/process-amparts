@@ -7,11 +7,33 @@ estoura TypeError, e um SORTING que chega como texto ordena lexicograficamente
 """
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pandas as pd
+import pytest
 
+from app.connectors import mysql_connector
 from app.connectors.mysql_connector import MySQLConnector, _frame
 from app.sources.amparts import build_eventlog
+
+
+_INI_CERT = "-----BEGIN CERTIFICATE-----"
+_FIM_CERT = "-----END CERTIFICATE-----"
+
+
+def _ca_pem() -> str:
+    """Um PEM de CA de verdade para os testes de TLS.
+
+    `cryptography` não é dependência do projeto (ver requirements.txt), então
+    não dá para gerar um certificado na hora — o bundle do certifi, que vem
+    junto do httpx, serve como PEM válido qualquer. Só o primeiro certificado:
+    o bundle inteiro passa dos 32 KB que o Windows aceita numa variável de
+    ambiente, e o teste inline o coloca no ambiente.
+    """
+    import certifi
+    bundle = Path(certifi.where()).read_text(encoding="utf-8")
+    ini, fim = bundle.index(_INI_CERT), bundle.index(_FIM_CERT) + len(_FIM_CERT)
+    return bundle[ini:fim] + "\n"
 
 ATIVIDADES = [
     # case, atividade,             eventtime,             sorting
@@ -107,27 +129,62 @@ def test_frame_preserva_none_em_coluna_decimal():
     assert df["v"].isna().sum() == 1
 
 
-def test_connector_nao_configurado_sem_variaveis(monkeypatch):
-    for v in ("AMPARTS_DB_HOST", "AMPARTS_DB_USER", "AMPARTS_DB_PASSWORD"):
-        monkeypatch.delenv(v, raising=False)
+def test_connector_nao_configurado_sem_senha(monkeypatch):
+    monkeypatch.delenv("PM_DB_PASSWORD", raising=False)
     assert MySQLConnector().configured() is False
 
 
-def test_connector_configurado_com_variaveis(monkeypatch):
-    monkeypatch.setenv("AMPARTS_DB_HOST", "10.0.0.1")
-    monkeypatch.setenv("AMPARTS_DB_USER", "u")
-    monkeypatch.setenv("AMPARTS_DB_PASSWORD", "p")
+def test_connector_usa_defaults_de_producao(monkeypatch):
+    for v in ("PM_DB_HOST", "PM_DB_PORT", "PM_DB_USER", "PM_DB_NAME"):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.setenv("PM_DB_PASSWORD", "p")
     c = MySQLConnector()
     assert c.configured() is True
-    assert c.port == 3306
-    assert c.database == "amparts"
+    assert (c.host, c.port, c.user, c.database) == ("192.3.60.208", 3306, "pm_app", "amparts")
 
 
 def test_ssl_sem_ca_cifra_mas_nao_autentica(monkeypatch):
     """Comportamento deliberado e documentado — o teste existe para que uma
     mudança acidental para CERT_NONE-com-CA (ou o contrário) apareça."""
-    monkeypatch.delenv("AMPARTS_DB_SSL_CA", raising=False)
+    monkeypatch.delenv("PM_DB_CA", raising=False)
+    monkeypatch.setattr(mysql_connector, "CA_FILE", tmp_path / "nao-existe.pem")
     import ssl as _ssl
     ctx = MySQLConnector(host="h", user="u", password="p")._ssl_context()
     assert ctx.verify_mode == _ssl.CERT_NONE
     assert ctx.check_hostname is False
+
+
+def test_ssl_com_ca_valida_cadeia_mas_nao_hostname(monkeypatch, tmp_path):
+    """Com CA a cadeia passa a ser verificada; check_hostname continua desligado
+    porque o host é um IP sem SAN correspondente no certificado."""
+    ca = tmp_path / "ca.pem"
+    ca.write_text(_ca_pem(), encoding="utf-8")
+    monkeypatch.setenv("PM_DB_CA", str(ca))
+    import ssl as _ssl
+    ctx = MySQLConnector(password="p")._ssl_context()
+    assert ctx.verify_mode == _ssl.CERT_REQUIRED
+    assert ctx.check_hostname is False
+    assert ctx.get_ca_certs()
+
+
+def test_ssl_aceita_ca_como_pem_inline(monkeypatch):
+    """No Railway o CA chega como conteúdo na variável, não como arquivo."""
+    monkeypatch.setenv("PM_DB_CA", _ca_pem())
+    ctx = MySQLConnector(password="p")._ssl_context()
+    assert ctx.get_ca_certs()
+
+
+def test_ssl_aceita_pem_com_cabecalho_de_comentario(monkeypatch):
+    """PEM exportado pelo openssl vem com Issuer/Subject antes do BEGIN. Se o
+    reconhecimento exigir BEGIN na primeira posição, o conteúdo é confundido
+    com um caminho de arquivo e a carga quebra no deploy."""
+    monkeypatch.setenv("PM_DB_CA", "# Issuer: CN=CA\n# Subject: CN=CA\n" + _ca_pem())
+    assert MySQLConnector(password="p")._ssl_context().get_ca_certs()
+
+
+def test_ssl_caminho_de_ca_inexistente_da_erro_explicito(monkeypatch, tmp_path):
+    """Erro de configuração precisa dizer o que houve: sobe em background e só
+    aparece como texto em /api/debug/config."""
+    monkeypatch.setenv("PM_DB_CA", str(tmp_path / "nao-existe.pem"))
+    with pytest.raises(RuntimeError, match="nao-existe.pem"):
+        MySQLConnector(password="p")._ssl_context()

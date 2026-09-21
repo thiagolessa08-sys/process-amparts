@@ -71,6 +71,22 @@ Variáveis de ambiente importantes:
 - **frontend** — `VITE_API_URL` apontando para a URL pública do backend.
 - **backend** — `ALLOWED_ORIGINS` com a URL do frontend (o CORS já libera
   `*.railway.app` por regex).
+- **backend** — `PM_DB_PASSWORD`: senha do usuário `pm_app` no MySQL. **Sem ela
+  o app sobe normalmente e serve o recorte congelado em CSV, sem erro nenhum** —
+  é a contingência. Host (`192.3.60.208`), porta, usuário e base (`amparts`) já
+  são o default no código; só precisam de variável (`PM_DB_HOST`, `PM_DB_PORT`,
+  `PM_DB_USER`, `PM_DB_NAME`) para apontar para outro servidor.
+- **backend** — `PM_DB_CA` (opcional): o **conteúdo** do PEM do CA, não um
+  caminho — no Railway não há arquivo para ler. Com ele a cadeia do servidor é
+  validada; sem ele o tráfego continua cifrado, mas o servidor não é
+  autenticado e a conexão fica sujeita a interceptação ativa. Em ambos os casos
+  a verificação de hostname fica desligada, porque o host é um IP e o
+  certificado não tem SAN correspondente.
+
+Depois de publicar, `GET /api/debug/config` responde de onde os dados vieram:
+`amparts_origem` é `"db"` quando leu do MySQL e `"csv"` quando caiu na
+contingência; `db_password_set` e `db_ca_set` dizem se as variáveis chegaram, e
+`amparts_error` traz a falha de carga quando houver.
 
 Também é possível disparar manualmente em **Actions → "Deploy (Railway)" → Run
 workflow**.

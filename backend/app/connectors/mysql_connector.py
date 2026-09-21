@@ -3,13 +3,14 @@
 Diferente do AgentConnector (HTTP → Java Agent → Sybase IQ), aqui a conexão é
 direta com um MySQL, com SSL obrigatório do lado do servidor.
 
-Config por ambiente:
-    AMPARTS_DB_HOST      obrigatório
-    AMPARTS_DB_PORT      opcional (3306)
-    AMPARTS_DB_USER      obrigatório
-    AMPARTS_DB_PASSWORD  obrigatório
-    AMPARTS_DB_NAME      opcional (amparts)
-    AMPARTS_DB_SSL_CA    opcional — caminho do CA. Ver _ssl_context().
+Config por ambiente (só a senha é obrigatória; o resto tem default do servidor
+de produção):
+    PM_DB_PASSWORD  obrigatório
+    PM_DB_HOST      opcional (192.3.60.208)
+    PM_DB_PORT      opcional (3306)
+    PM_DB_USER      opcional (pm_app)
+    PM_DB_NAME      opcional (amparts)
+    PM_DB_CA        opcional — caminho do CA ou o PEM inteiro. Ver _ssl_context().
 
 O event log tem ~1,1M linhas no recorte de um ano, então a leitura é feita com
 cursor server-side (SSCursor) em blocos: sem isso o pymysql materializa o
@@ -20,12 +21,18 @@ import os
 import ssl
 import time
 from decimal import Decimal
+from pathlib import Path
 
 import pandas as pd
 import pymysql
 from pymysql.cursors import SSCursor
 
 CHUNK = 50_000
+HOST = "192.3.60.208"
+PORT = 3306
+USER = "pm_app"
+DATABASE = "amparts"
+CA_FILE = Path(__file__).resolve().parents[2] / "amparts-ca.pem"
 # quedas transientes observadas neste servidor ("Lost connection during query"),
 # inclusive durante o handshake. SELECT é idempotente → retry é seguro.
 _RETRY_EXC = (pymysql.err.OperationalError, pymysql.err.InterfaceError)
@@ -33,12 +40,14 @@ _RETRY_EXC = (pymysql.err.OperationalError, pymysql.err.InterfaceError)
 
 class MySQLConnector:
     def __init__(self, host=None, port=None, user=None, password=None, database=None):
-        self.host = host or os.environ.get("AMPARTS_DB_HOST", "")
-        self.port = int(port or os.environ.get("AMPARTS_DB_PORT") or 3306)
-        self.user = user or os.environ.get("AMPARTS_DB_USER", "")
-        self.password = password or os.environ.get("AMPARTS_DB_PASSWORD", "")
-        self.database = database or os.environ.get("AMPARTS_DB_NAME", "amparts")
-        self.ssl_ca = os.environ.get("AMPARTS_DB_SSL_CA", "")
+        self.host = host or os.environ.get("PM_DB_HOST") or HOST
+        self.port = int(port or os.environ.get("PM_DB_PORT") or PORT)
+        self.user = user or os.environ.get("PM_DB_USER") or USER
+        self.password = password or os.environ.get("PM_DB_PASSWORD", "")
+        self.database = database or os.environ.get("PM_DB_NAME") or DATABASE
+        # o CA pode vir como caminho (arquivo no disco) ou como o PEM inteiro,
+        # que é a única forma prática de entregá-lo no Railway.
+        self.ca = os.environ.get("PM_DB_CA") or (str(CA_FILE) if CA_FILE.exists() else "")
 
     def configured(self) -> bool:
         return bool(self.host and self.user and self.password and self.database)
@@ -46,17 +55,28 @@ class MySQLConnector:
     def _ssl_context(self) -> ssl.SSLContext:
         """Contexto TLS.
 
-        Com AMPARTS_DB_SSL_CA apontando para o CA do servidor, o certificado é
-        validado de verdade. Sem ele, o tráfego continua cifrado mas o servidor
-        NÃO é autenticado — necessário hoje porque o host é um IP e o certificado
-        não tem SAN correspondente, o que faria a verificação falhar. Enquanto
-        estiver assim, a conexão é vulnerável a interceptação ativa.
+        Com o CA (PM_DB_CA, ou amparts-ca.pem na raiz do backend) a cadeia do
+        servidor é validada de verdade. check_hostname fica desligado mesmo
+        assim porque o host é um IP e o certificado não tem SAN correspondente:
+        ligado, o handshake falharia antes de chegar ao banco.
+
+        Sem CA nenhum o tráfego continua cifrado, mas o servidor NÃO é
+        autenticado — nesse estado a conexão é vulnerável a interceptação ativa.
         """
-        if self.ssl_ca:
-            return ssl.create_default_context(cafile=self.ssl_ca)
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        if not self.ca:
+            ctx.verify_mode = ssl.CERT_NONE
+        elif "-----BEGIN" in self.ca:
+            # procura o marcador em qualquer posição, não só no início: PEM
+            # exportado pelo openssl vem com cabeçalho de comentário antes dele.
+            ctx.load_verify_locations(cadata=self.ca)
+        elif Path(self.ca).exists():
+            ctx.load_verify_locations(cafile=self.ca)
+        else:
+            raise RuntimeError(
+                f"PM_DB_CA aponta para um arquivo inexistente: {self.ca}. "
+                "No Railway use o conteúdo do PEM na variável, não um caminho.")
         return ctx
 
     def connect(self, cursorclass=None, tries: int = 4):
