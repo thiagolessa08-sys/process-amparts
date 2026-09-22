@@ -30,11 +30,12 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 ACT_FILE = DATA_DIR / f"amparts_atividades_{ANO}.csv.gz"
 CASE_FILE = DATA_DIR / f"amparts_cases_{ANO}.csv.gz"
 
-# Início da janela da carga por banco. Começava em janeiro, mas os ~1,1M eventos
-# do ano inteiro não cabem nos 8 GB por réplica do plano: o pico do `concat` no
-# fim do streaming derrubava o processo, que reiniciava e recomeçava a carga sem
-# nunca chegar ao fim. Junho corta a janela para ~4 meses.
-MES_INICIAL = 6
+# Início da janela da carga por banco. O ano inteiro (~1,1M eventos) não cabia
+# nos 8 GB por réplica do plano Hobby — o pico do `concat` no fim do streaming
+# derrubava o processo em ciclo de reinício — e a janela foi cortada para junho.
+# Com o Pro (24 GB por réplica) volta a janeiro. Se o ciclo reaparecer, este é o
+# dígito a mexer; a carga completa leva ~25 min mais o pré-cálculo da tela.
+MES_INICIAL = 1
 DESDE = f"{ANO}-{MES_INICIAL:02d}-01"
 
 _READ = dict(sep=";", dtype=str, encoding="utf-8-sig", on_bad_lines="skip")
