@@ -281,7 +281,10 @@ export default function App() {
   useEffect(() => {
     if (!auth?.token) return;   // só carrega depois de autenticado (evita 401 no mount)
     if (chatOnly) { setLoading(false); return; }   // só-chat: sem carga do payload
-    yearDefaulted.current = null; setFilters(EMPTY_FILTERS); load(moduleKey, EMPTY_FILTERS);
+    // a marca vive no estado (não só nesta chamada) para sobreviver ao retry do
+    // polling em 503, que relança `load` com `filters`
+    const inicial = { ...EMPTY_FILTERS, defaultPeriod: true };
+    yearDefaulted.current = null; setFilters(inicial); load(moduleKey, inicial);
   }, [moduleKey, load, auth, chatOnly]);
   useEffect(() => { setDrill(null); }, [moduleKey, screen]);
 
@@ -305,7 +308,10 @@ export default function App() {
     if (!data || data.key !== moduleKey || yearDefaulted.current === moduleKey) return;
     const years = data.filters?.years || [];
     yearDefaulted.current = moduleKey;
-    if (years.length && !filters.ano) onFiltersChange({ ...filters, ano: Math.max(...years) });
+    // a marca sai aqui: daqui em diante, limpar o ano volta a pedir o log inteiro
+    const semMarca = { ...filters, defaultPeriod: false };
+    if (years.length && !filters.ano) onFiltersChange({ ...semMarca, ano: Math.max(...years) });
+    else setFilters(semMarca);
   }, [data, moduleKey, filters, onFiltersChange]);
 
   async function onRefresh() {

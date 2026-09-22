@@ -58,6 +58,9 @@ function filterParams(filters = {}) {
     params.set("act_id", filters.activity.id);
     params.set("act_mode", filters.activity.mode);
   }
+  // primeira carga do módulo: o backend já responde pelo ano mais recente, em
+  // vez de calcular o log inteiro para a tela descartar em seguida
+  if (filters.defaultPeriod) params.set("default_period", "1");
   return params.toString();
 }
 

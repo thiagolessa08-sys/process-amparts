@@ -1,4 +1,5 @@
 import base64
+import functools
 import hashlib
 import json
 import os
@@ -23,6 +24,7 @@ from app.connectors.agent_connector import AgentConnector
 from app.mining.dfg import discover_dfg
 from app.mining.variants import discover_variants
 from app.mining.stats import compute_statistics
+from app.modules.headline import case_ref_date
 from app.eventlog import CASE_ID, ACTIVITY, TIMESTAMP
 
 app = FastAPI(title="Process Mining API")
@@ -115,6 +117,20 @@ def _apply_filters(
         log = log[log[CASE_ID].isin(valid.index)]
 
     return log
+
+
+def _ano_padrao(log: pd.DataFrame, order_activity: Optional[str]) -> Optional[int]:
+    """Ano mais recente entre as datas de referência dos casos.
+
+    É o mesmo ano que o App.jsx escolhe de `filters.years` assim que o primeiro
+    payload chega (`yearDefaulted`). Sem resolver aqui, a primeira chamada vem
+    sem período, o enrich roda sobre o log inteiro e o resultado é descartado
+    pela segunda chamada, já com o ano. Usa `case_ref_date` de propósito: é a
+    função que alimenta `filters.years`, então os dois lados concordam sempre.
+    """
+    if log.empty:
+        return None
+    return int(case_ref_date(log, order_activity).dt.year.max())
 
 
 def _case_ref_date(log: pd.DataFrame, order_activity: Optional[str]) -> pd.Series:
@@ -245,6 +261,8 @@ def debug_config():
         "amparts_origem": get_origem(),
         # confirma qual janela o deploy no ar está usando
         "amparts_desde": DESDE,
+        # >0 depois da carga = a visão padrão foi pré-calculada (WARMERS)
+        "enrich_cache_entries": len(_ENRICH_CACHE),
         "db_password_set": bool(db.password),
         "db_name": db.database,
         "db_ca_set": bool(db.ca),
@@ -313,6 +331,51 @@ def refresh_module(key: str, x_admin_token: Optional[str] = Header(default=None)
     return {"ok": True, "status": data_source.real_status(key)}
 
 
+def _chave_enrich(key, fornecedores=(), start_date=None, end_date=None, ano=None, mes=None,
+                  dias=(), produto=None, act_id=None, act_mode=None, variant=(),
+                  variant_mode="include"):
+    """Chave do _ENRICH_CACHE. Função única de propósito: o pré-cálculo da visão
+    padrão e a requisição real precisam cair na mesma entrada."""
+    return (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, tuple(sorted(dias)),
+            produto, act_id, act_mode, tuple(sorted(variant)), variant_mode)
+
+
+def _enriquecer(module, log: pd.DataFrame) -> dict:
+    payload = module.enrich(log)
+    # chave de variante (assinatura da sequência) p/ o front filtrar pela seleção
+    for v in payload.get("variants", []):
+        path = v.get("path") or []
+        v["key"] = _seq_key(path[1:-1])
+    return payload
+
+
+def _guardar_enrich(ck, payload: dict) -> None:
+    if len(_ENRICH_CACHE) > 64:
+        _ENRICH_CACHE.clear()
+    _ENRICH_CACHE[ck] = payload
+
+
+def _warm_default(key: str, log: pd.DataFrame, progress) -> None:
+    """Pré-calcula a visão que a tela pede na primeira carga — ano mais recente,
+    sem outros filtros — e a deixa no cache antes de a fonte ficar `ready`.
+
+    Roda na thread de carga (data_source.WARMERS). Com a janela toda num ano só,
+    esse enrich é sobre o log inteiro: é exatamente o que deixava a primeira
+    requisição pendurada por minutos. Aqui a espera aparece na barra de
+    progresso, e a requisição vira um cache hit.
+    """
+    module = module_registry.get(key)
+    if module is None or log.empty:
+        return
+    progress(95)
+    ano = _ano_padrao(log, module.order_activity)
+    filtrado = _apply_filters(log, [], None, None, ano, None, [], None,
+                              order_activity=module.order_activity)
+    if filtrado.empty:
+        return
+    _guardar_enrich(_chave_enrich(key, ano=ano), _enriquecer(module, filtrado))
+
+
 @app.get("/api/modules/{key}", dependencies=[Depends(require_module_access)])
 def get_module(
     key: str,
@@ -327,31 +390,36 @@ def get_module(
     act_mode: Optional[str] = Query(default=None),
     variant: list[str] = Query(default=[]),
     variant_mode: str = Query(default="include"),
+    default_period: bool = Query(default=False),
 ):
     module = module_registry.get(key)
     if not module:
         raise HTTPException(status_code=404, detail=f"Modulo '{key}' nao encontrado")
     _guard_real(key)
-    ck = (key, tuple(sorted(fornecedores)), start_date, end_date, ano, mes, tuple(sorted(dias)), produto,
-          act_id, act_mode, tuple(sorted(variant)), variant_mode)
+    log = None
+    sem_periodo = not (ano or mes or dias or start_date or end_date)
+    if default_period and sem_periodo:
+        # `default_period` só vem na primeira carga do módulo (App.jsx); sem a
+        # marca, "sem período" continua significando o log inteiro — é como o
+        # usuário limpa o ano. Resolvido ANTES da chave de cache: `ano=None` e
+        # `ano=2026` precisam ser a mesma entrada, senão o enrich roda duas vezes.
+        log = data_source.get_log(module_key=key)
+        ano = _ano_padrao(log, module.order_activity)
+    ck = _chave_enrich(key, fornecedores, start_date, end_date, ano, mes, dias, produto,
+                       act_id, act_mode, variant, variant_mode)
     cached = _ENRICH_CACHE.get(ck)
     if cached is not None:
         return cached
-    log = data_source.get_log(module_key=key)
+    if log is None:
+        log = data_source.get_log(module_key=key)
     log = _apply_filters(log, fornecedores, start_date, end_date, ano, mes, dias, produto,
                          order_activity=module.order_activity)
     log = _apply_activity_filter(log, module, act_id, act_mode)
     log = _apply_variant_filter(log, module, variant, variant_mode)
     if log.empty or log[CASE_ID].nunique() == 0:
         raise HTTPException(status_code=422, detail="Nenhum caso encontrado para os filtros aplicados")
-    payload = module.enrich(log)
-    # chave de variante (assinatura da sequência) p/ o front filtrar pela seleção
-    for v in payload.get("variants", []):
-        path = v.get("path") or []
-        v["key"] = _seq_key(path[1:-1])
-    if len(_ENRICH_CACHE) > 64:
-        _ENRICH_CACHE.clear()
-    _ENRICH_CACHE[ck] = payload
+    payload = _enriquecer(module, log)
+    _guardar_enrich(ck, payload)
     return payload
 
 
@@ -593,3 +661,8 @@ async def upload(file: UploadFile = File(...)):
     _ENRICH_CACHE.clear()
     _CASES_CACHE.clear()
     return {"status": "ok", "filename": file.filename}
+
+
+# depois de todas as definições: o warm usa _apply_filters, _seq_key e o registry
+for _k in data_source.REAL_LOADERS:
+    data_source.WARMERS[_k] = functools.partial(_warm_default, _k)

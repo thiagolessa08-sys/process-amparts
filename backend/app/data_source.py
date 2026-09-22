@@ -20,6 +20,11 @@ _state = {"path": None}                       # override manual (upload)
 _cache: dict[str, pd.DataFrame] = {}          # logs de fontes reais (caros)
 _real = {k: {"loading": False, "error": None, "progress": 0} for k in REAL_LOADERS}
 _lock = threading.Lock()
+# aquecedores por fonte: recebem (log, progress) depois da carga e ANTES de a
+# fonte ficar `ready`. É onde a visão padrão da tela é pré-calculada: sem isso a
+# primeira requisição paga o enrich inteiro pendurada num spinner, em vez de a
+# espera aparecer na barra de progresso que já existe. Registrados pelo main.
+WARMERS: dict = {}
 
 
 def _set_progress(key: str, pct) -> None:
@@ -39,7 +44,18 @@ def _load_real(key: str, progress=None) -> pd.DataFrame:
 
 def _bg_load(key: str) -> None:
     try:
-        _cache[key] = _load_real(key, progress=lambda p: _set_progress(key, p))
+        progress = lambda p: _set_progress(key, p)  # noqa: E731
+        log = _load_real(key, progress=progress)
+        warm = WARMERS.get(key)
+        if warm is not None:
+            try:
+                warm(log, progress)
+            except Exception as exc:  # noqa: BLE001
+                # aquecer é otimização: falhar aqui não pode derrubar a carga
+                print(f"[{key}] falha ao pré-calcular a visão padrão: {exc}")
+        # só agora a fonte vira `ready` — o log entrar no cache antes do warm
+        # deixaria uma requisição passar e pagar o enrich que estamos evitando
+        _cache[key] = log
         _real[key]["error"] = None
         _real[key]["progress"] = 100
     except Exception as exc:  # noqa: BLE001
