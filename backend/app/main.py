@@ -228,7 +228,7 @@ def debug_config():
     booleanos que respondem "por que o Railway não está lendo do MySQL?".
     """
     from app.connectors.mysql_connector import MySQLConnector
-    from app.sources.amparts import get_origem
+    from app.sources.amparts import DESDE, get_origem
 
     url = os.environ.get("AGENT_URL", "")
     key = os.environ.get("AGENT_API_KEY", "")
@@ -243,6 +243,8 @@ def debug_config():
         "amparts_error": data_source.real_error("amparts"),
         # "db" = leu do MySQL; "csv" = caiu na contingência (dado congelado)
         "amparts_origem": get_origem(),
+        # confirma qual janela o deploy no ar está usando
+        "amparts_desde": DESDE,
         "db_password_set": bool(db.password),
         "db_name": db.database,
         "db_ca_set": bool(db.ca),

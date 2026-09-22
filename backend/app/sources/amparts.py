@@ -9,9 +9,9 @@ finalização) entre o pedido e o faturamento da saída.
 Duas fontes, na ordem: **MySQL** (`amparts.SQL_PM_*`) quando PM_DB_PASSWORD
 estiver no ambiente, e o recorte em **arquivo** como contingência.
 
-Em ambos os casos carregamos apenas o recorte de um ano (ver ANO): o banco tem
-3,4M eventos entre 2023 e 2029, e o volume total não cabe no plano de memória
-do servidor.
+Nunca carregamos a base inteira: o banco tem 3,4M eventos entre 2023 e 2029 e o
+volume total não cabe na memória do servidor. A carga por banco usa a janela
+DESDE..hoje; o arquivo de contingência traz o ano de ANO inteiro.
 """
 from pathlib import Path
 
@@ -30,14 +30,19 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 ACT_FILE = DATA_DIR / f"amparts_atividades_{ANO}.csv.gz"
 CASE_FILE = DATA_DIR / f"amparts_cases_{ANO}.csv.gz"
 
-DESDE = f"{ANO}-01-01"
+# Início da janela da carga por banco. Começava em janeiro, mas os ~1,1M eventos
+# do ano inteiro não cabem nos 8 GB por réplica do plano: o pico do `concat` no
+# fim do streaming derrubava o processo, que reiniciava e recomeçava a carga sem
+# nunca chegar ao fim. Junho corta a janela para ~4 meses.
+MES_INICIAL = 6
+DESDE = f"{ANO}-{MES_INICIAL:02d}-01"
 
 _READ = dict(sep=";", dtype=str, encoding="utf-8-sig", on_bad_lines="skip")
 
 
 def _periodo_where() -> str:
-    """Janela usada na carga por banco: o ano corrente do recorte, com teto em
-    hoje — o export traz eventos carimbados até 2029, que são datas inválidas."""
+    """Janela usada na carga por banco: de DESDE até hoje. O teto existe porque
+    o export traz eventos carimbados até 2029, que são datas inválidas."""
     hoje = pd.Timestamp.now().strftime("%Y-%m-%d")
     return f"EVENTTIME >= '{DESDE}' AND EVENTTIME <= '{hoje} 23:59:59'"
 
